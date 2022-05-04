@@ -1,0 +1,14 @@
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: restrict-development-access
+spec:
+  namespaceSelector: 'kubernetes.io/metadata.name == "athena-dev"'
+  ingress:
+    - action: Allow
+      source:
+        namespaceSelector: 'kubernetes.io/metadata.name == "athena-dev"'
+  egress:
+    - action: Allow
+      destination:
+        namespaceSelector: 'kubernetes.io/metadata.name == "athena-dev"'

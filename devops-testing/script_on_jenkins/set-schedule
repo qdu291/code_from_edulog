@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+import sys
+import datetime
+import pickle
+import os.path
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+
+# If modifying these scopes, delete the file token.pickle.
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar'
+]
+
+CREDENTIALS_FILE = '/usr/local/bin/credentials.json'
+
+def get_calendar_service():
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('/usr/local/bin/token.pickle'):
+        with open('/usr/local/bin/token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                CREDENTIALS_FILE, SCOPES)
+            creds = flow.run_local_server(port=0)
+
+        #Save the credentials for the next run
+        with open('/usr/local/bin/token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    service = build('calendar', 'v3', credentials=creds)
+    return service
+
+def set_event(expired_date, tenant_name, requester_name):
+    '''
+    expired_date: yyyy-mm-dd - Eg. expired_date = '2020-11-28'
+    tenant_name: name of the tenant
+    '''
+    event = {
+        'summary': "Teminate: " + tenant_name,
+        'location': 'Karros Technologies',
+        'description': 'Be noted to do the cleaning up...',
+        'start': {
+            'dateTime': expired_date + 'T09:00:00-07:00',
+            'timeZone': 'GMT+07:00',
+        },  
+        'end': {
+            'dateTime': expired_date + 'T17:00:00-07:00',
+            'timeZone': 'GMT+07:00',
+        },
+        'recurrence': [
+            'RRULE:FREQ=DAILY;COUNT=2'
+        ],
+        'attendees': [
+            {'email': 'kt-devops@karrostech.com'},
+            {'email': requester_name},
+        ],
+        'reminders': {
+            'useDefault': False,
+            'overrides': [
+                {'method': 'email', 'minutes': 24 * 60},
+                {'method': 'popup', 'minutes': 10},
+            ],
+        },
+    }
+
+    service = get_calendar_service()
+    event = service.events().insert(calendarId='primary', body=event).execute()
+
+if __name__ == "__main__":
+    date = sys.argv[1]
+    tenant = sys.argv[2]
+    requester_name = sys.argv[3]
+    set_event(date, tenant, requester_name)

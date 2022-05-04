@@ -1,0 +1,13 @@
+athena.env.name=nonprod
+athena.env.name=stage
+tenantconfig.api.url=https://athenagateway-p01-demo.usw2.karrostech.net/api/
+debezium_controller.api.key=Y4BwX5q58bfcfeaig7iR6u1CBINwb6dA5gY7rc70
+debezium_controller.api.url=https://zzciu1ond8.execute-api.us-east-2.amazonaws.com/default/debezium-controller
+karros.api.key=9d6c3f85669a40cd1b1fa4635b049b92bb04c881
+karros.athenagateway=athenagateway-p01-demo.usw2.karrostech.net
+karros.keycloak.clientid=athena-backend
+karros.keycloak.clientsecret=4fc89ec7-3af8-4649-a014-529ef2975805
+karros.keycloak.forgotpasswordurl=https://aaa-demo.usw2.karrostech.net/auth/realms/Edulog/karros-auth/forgot-password
+karros.keycloak.logouturl=https://aaa-demo.usw2.karrostech.net/auth/realms/Edulog/protocol/openid-connect/logout
+karros.keycloak.url=https://aaa-demo.usw2.karrostech.net/auth/realms/Edulog/protocol/openid-connect/token
+karros.login.url=https://athenagateway-p01-demo.usw2.karrostech.net/api/v1/signin

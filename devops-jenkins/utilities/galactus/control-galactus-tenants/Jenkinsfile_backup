@@ -1,0 +1,109 @@
+pipeline{
+  agent any
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'Tenant_Name', choices: ['demoleg', 'stateleg'], description: 'Choose a Tenant to do')
+    choice(name: 'Tenant_Action', choices: ['get_status', 'start', 'stop'], description: 'Choose the action')
+  }
+
+  // define resources ID
+  environment {
+    demoleg_BE_ID = "i-08d58e7bd2ffe3c44"
+    demoleg_CQ_ID = "i-0508432f030dc0529"
+    demoleg_WOSNOS_ID = "i-0074466875b8aca82"
+    demoleg_RDS_ID = "athena-demoleg-rds"
+    
+    stateleg_BE_ID = "i-0de25745321e00238"
+    stateleg_CQ_ID = "i-0d71b1bed719f860b"
+    stateleg_WOSNOS_ID = "stateleg_WOSNOS_ID"
+    stateleg_RDS_ID = "athena-stageleg-rds"
+  }
+
+  stages {
+
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Running') {
+          steps {
+            script {
+              // Assign Tenant_Name to Variable
+              switch(Tenant_Name) {
+                case 'demoleg':
+                  env.BE_ID = demoleg_BE_ID
+                  env.CQ_ID = demoleg_CQ_ID
+                  env.RDS_ID = demoleg_RDS_ID
+                break
+                case 'stateleg':
+                  env.BE_ID = stateleg_BE_ID
+                  env.CQ_ID = stateleg_CQ_ID
+                  env.RDS_ID = stateleg_RDS_ID
+                break
+              }
+              
+              switch(Tenant_Action) {
+                // Case == Start
+                case 'start':
+                  echo "==> Start ${Tenant_Name} BE instance"
+                  sh "aws ec2 start-instances --instance-ids ${BE_ID} --region us-east-2"
+                  echo "==> Start ${Tenant_Name} CQ instance"
+                  sh "aws ec2 start-instances --instance-ids ${CQ_ID} --region us-east-2"
+                  echo "==> Start ${Tenant_Name} RDS"
+                  sh "aws rds start-db-instance --db-instance-identifier ${RDS_ID} --region us-east-2"                 
+                break
+
+                // Case == Stop 
+                case 'stop':
+                  echo "==> Stop ${Tenant_Name} BE instance"
+                  sh "aws ec2 stop-instances --instance-ids ${BE_ID} --region us-east-2"
+                  echo "==> Stop ${Tenant_Name} CQ instance"
+                  sh "aws ec2 stop-instances --instance-ids ${CQ_ID} --region us-east-2"
+                  echo "==> Stop ${Tenant_Name} RDS"
+                  sh "aws rds stop-db-instance --db-instance-identifier ${RDS_ID} --region us-east-2"
+                break
+
+                // Case == Get_Status
+                case 'get_status':
+                  BE_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${BE_ID} --region us-east-2 --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  CQ_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${CQ_ID} --region us-east-2 --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  RDS_STATUS = sh(script: 'aws rds describe-db-instances --db-instance-identifier ${RDS_ID} --region us-east-2 --query "DBInstances[].DBInstanceStatus" --output text', returnStdout: true).trim()
+                  echo "==> ${Tenant_Name} BE instance is ${BE_STATUS}"
+                  echo "==> ${Tenant_Name} CQ instance is ${CQ_STATUS}"
+                  echo "==> ${Tenant_Name} RDS is ${RDS_STATUS}"
+                break
+
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  post {
+    always {
+      echo "=> Clean Workspace after run"
+      cleanWs()
+    }
+    success {
+      echo "==> Build Success"
+    }
+    failure {
+      echo "==> Build Failure"
+    }
+  }
+}

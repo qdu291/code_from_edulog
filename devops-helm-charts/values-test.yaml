@@ -1,0 +1,70 @@
+aggregateservice:
+  image:
+    tag: 1.19.0
+configMap:
+  athenaKafkaConsumers: b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+  athenaKafkaProducers: b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+  cacheHost: mongo
+  dbHost: athena-testing-01-eks-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com
+  dbName: Athena
+  dbPass: edul0g
+  dbUser: edulog
+  envType: nonprod
+  geoServerHost: geoserverservice
+  geoServerPort: '8070'
+  kafkaBootstrapServers: b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+  karrosGateway: athenagateway-p01-demo.usw1.karrostech.net
+  keycloadSecret: 4fc89ec7-3af8-4649-a014-529ef2975805
+  keycloakBackendId: athena-backend
+  keycloakDomain: aaa-demo.usw2.karrostech.net
+  keycloakId: athena
+  nosHost: 10.11.5.15
+  nosPort: '8901'
+  queueHost: rabbitmq
+  queuePass: edul0g
+  queueUser: edulog
+  siteName: testing-01-eks
+  tenantId: 0462c4ce-c294-4cfc-9225-219dcb5256b1
+edtaservice:
+  image:
+    tag: 1.19.0
+gateway:
+  image:
+    tag: 1.19.0
+geocalculationservice:
+  image:
+    tag: latest
+geocodeservice:
+  image:
+    tag: 1.19.0
+importingservice:
+  image:
+    tag: 1.19.0
+ivinservice:
+  image:
+    tag: 1.19.0
+overlayservice:
+  image:
+    tag: 1.19.0
+plannedrolloverservice:
+  image:
+    tag: 1.19.0
+reportservice:
+  image:
+    tag: 1.19.0
+routingmigration:
+  image:
+    tag: 1.19.0
+routingservice:
+  image:
+    tag: 1.19.0
+rresservice:
+  image:
+    tag: 1.19.0
+tags:
+  core: true
+  mapOverlay: true
+  rideRegistration: true
+tnxhubservice:
+  image:
+    tag: 1.19.0

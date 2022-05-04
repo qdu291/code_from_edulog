@@ -1,0 +1,14 @@
+---
+plugin: amazon.aws.aws_ec2
+aws_profile: karros
+regions:
+  - us-east-2
+filters:
+  tag:project: athena
+keyed_groups:
+  - key: tags.tenant
+    prefix: tenant
+  - key: tags.type
+    prefix: type
+compose:
+  ansible_host: private_ip_address

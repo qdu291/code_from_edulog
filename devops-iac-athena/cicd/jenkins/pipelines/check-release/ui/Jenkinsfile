@@ -1,0 +1,31 @@
+pipeline {
+  agent any
+
+  environment {
+    ENV = 'dev'
+    GIT_TAG = sh (script: 'curl --silent -H "Authorization: token $GIT_TOKEN" "https://api.github.com/repos/eduloginc/EduLog-AthenaUI-v1_2/releases/latest" | jq -r ".tag_name"', returnStdout: true).trim()
+    SSM_TAG = sh (script: 'aws ssm get-parameter --name /Athena/EduLog-AthenaUI-v1_2/release/latest | jq -r ".Parameter.Value"', returnStdout: true).trim()
+  }
+
+  stages {
+    stage('Build') {
+      steps {
+        script {
+            if (env.GIT_TAG == env.SSM_TAG){
+                sh 'echo "Current release is latest"'
+            }
+            else {
+                //trigger downstream job
+                build job: 'ui-build',
+                parameters: [
+                    string(name: 'type', value: 'tag'),
+                    string(name: 'specifier', value: env.GIT_TAG)
+                ]
+                sh "aws ssm put-parameter --name /Athena/EduLog-AthenaUI-v1_2/release/latest --value $GIT_TAG --overwrite --type 'String' " 
+            }
+        }
+      }
+    }
+  }
+
+}

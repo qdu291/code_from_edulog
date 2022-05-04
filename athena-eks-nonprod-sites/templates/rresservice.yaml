@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rresservice
+  labels:
+    svc: rresservice
+spec:
+  selector:
+    app: rresservice
+  ports:
+  - protocol: TCP
+    port: 8086
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rresservice
+  labels:
+    name: rresservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rresservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: rresservice
+        app: rresservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/rres:1.46.3
+        name: rresservice
+        command: ["/bin/sh", "-c"]
+        args:
+        - >
+          . /home/athena/athena.env && java
+          -Dspring.profiles.active=eks
+          -Dmanagement.context-path=/
+          -Dmanagement.endpoints.web.base-path=/
+          -Dmanagement.endpoints.web.exposure.include="*"
+          -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+          --kafka.bootstrap-servers=${ATHENA_KAFKA_CONSUMERS}
+          --kafka.consumer.group-id=${TENANT}-rideRegistrationRequest
+          --kafka.consumer.topics=${TENANT_ID}-athenaRideRegistrationChange-usw2demo
+          --mongo.url=mongodb://${CACHE_HOST}:27017/?uuidRepresentation=STANDARD
+          --application.athena.tenant.id=${TENANT_ID}
+          --application.athena.root=http://tnxhubservice:8090/api/v1
+          --application.karros.login.url=https://${KARROS_GATEWAY}/api/v1/signin
+          --application.karros.keycloak.client-id=${KEYCLOAK_BACKEND_ID}
+          --application.karros.keycloak.client-secret=${KEYCLOAK_SECRET}
+          --application.karros.keycloak.url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/token
+          --application.karros.keycloak.logout-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/logout
+          --application.karros.keycloak.forgot-password-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/karros-auth/forgot-password
+        ports:
+        - containerPort: 8086
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

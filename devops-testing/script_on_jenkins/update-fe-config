@@ -1,0 +1,18 @@
+#!/bin/bash -xe
+filename=$1
+fe_version=$2
+be_env=$3
+env=$4
+
+# Update Protocol
+jq ".protocol = \"https://\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+# Update Websocket Path
+jq ".smqPath = \"/ws\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+# Update BE URL
+if [ -n "$env" ] && [ $env = "prod" ]; then
+  jq ".baseUrl = \"ath-be-${be_env}.karrostech.net\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+else
+  jq ".baseUrl = \"ath-be-${be_env}.athena-nonprod.com\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+fi
+# Update FE version
+jq ".version = \"${fe_version}\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json

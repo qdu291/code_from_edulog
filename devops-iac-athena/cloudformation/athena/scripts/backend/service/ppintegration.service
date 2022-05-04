@@ -1,0 +1,13 @@
+[Unit]
+Description=Athena PP Integration Services
+After=network.target
+
+[Service]
+ExecStartPre=/bin/sleep 5
+Type=simple
+ExecStart=/opt/edulog/run/ppintegration.sh
+User=root
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

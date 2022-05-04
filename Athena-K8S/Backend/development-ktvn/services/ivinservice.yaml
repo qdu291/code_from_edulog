@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: development-ktvn
+  name: ivinservice
+  labels:
+    svc: ivinservice
+spec:
+  selector:
+    app: ivinservice
+  ports:
+  - protocol: TCP
+    port: 8088
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: development-ktvn
+  name: ivinservice
+
+  labels:
+    name: ivinservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ivinservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: ivinservice
+        app: ivinservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/ivin:3975b05dd435738060de4edde99c3b562c2c991a
+        name: ivinservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - . /home/athena/athena.env;java -Dserver.tomcat.mbeanregistry.enabled=true -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar
+        ports:
+        - containerPort:  8088
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ivinservice
+  namespace: development-ktvn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ivinservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

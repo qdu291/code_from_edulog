@@ -1,0 +1,94 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "VPN Stack"
+Parameters:
+  VPCStackName:
+    Description: Stack Name of VPC
+    Type: String
+    Default: "edulogvn-vpc"
+  SGStackName:
+    Description: Stack Name of Security Group
+    Type: String
+    Default: "edulogvn-securitygroups"
+  VPNAMIId:
+    Description: VPN AMI Id
+    Type: AWS::EC2::Image::Id
+    Default: "ami-082581e816634cabd"
+  KeyPair:
+    Description: Instance KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: "edulogvn-devops"
+  InstanceType:
+    Description: Athena DB Instance Type
+    Type: String
+    AllowedValues:
+      - t3.micro # $0.0104 per Hour
+      - t3.small # $0.0208 per Hour
+      - t3a.micro # $0.0094 per Hour
+      - t3a.small # $0.0188 per Hour
+    Default: "t3a.micro"
+  ASGMaxSize:
+    Default: "1"
+    Description: Maximum No of instances in ASG
+    Type: Number
+  ASGMinSize:
+    Default: "1"
+    Description: Minimum No of instances in ASG
+    Type: Number
+  ASGDesiredCapacity:
+    Default: "1"
+    Description: Desired No of instances in ASG
+    Type: Number
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref VPNAMIId
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - Fn::ImportValue: !Sub ${SGStackName}-VPNInstanceSG
+      IamInstanceProfile: !Ref InstanceProfile
+      KeyName: !Ref KeyPair
+  AutoScaling:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref LaunchConfig
+      MinSize: !Ref ASGMinSize
+      MaxSize: !Ref ASGMaxSize
+      DesiredCapacity: !Ref ASGDesiredCapacity
+      VPCZoneIdentifier:
+        - { "Fn::ImportValue": !Sub "${VPCStackName}-PublicSubnet1ID" }
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-instance
+          PropagateAtLaunch: true
+  CPUTargetTrackingScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScaling
+      Cooldown: "60"
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 90.0

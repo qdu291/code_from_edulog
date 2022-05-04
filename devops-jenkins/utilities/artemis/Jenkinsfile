@@ -1,0 +1,121 @@
+pipeline{
+  agent any
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'Instance_Name', choices: ['ApolloDekalbGA-01', 'ApolloDekalbGA-02', 'ApolloDekalbGA-03', 'ApolloDekalbGA-04-(Galactus)', 'vbcloud.karrostech.net'], description: 'Choose an Instance')
+    choice(name: 'Instance_Action', choices: ['get_status', 'start', 'stop'], description: 'Choose the action')
+  }
+
+  // define resources ID
+  environment {
+    ZONEID = "Z014970921I50U3PAVNOP"
+    APOLLODEKALBGA_01_ID = "i-0e9d1194cd5d1d6cc"
+    APOLLODEKALBGA_02_ID = "i-02122b13ccb4ab38c"
+    APOLLODEKALBGA_03_ID = "i-0e68df41f331e4900"
+    APOLLODEKALBGA_04_ID = "i-0a0569e389ddb61f2"
+    VBCLOUD_ID = "i-000283b768f6e9b63"
+  }
+
+  stages {
+
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Running') {
+          steps {
+            script {
+              // Assign Instance_Name to Variable
+              switch(Instance_Name) {
+                case 'ApolloDekalbGA-01':
+                  env.instance_ID = APOLLODEKALBGA_01_ID
+                  env.aws_profile = "driverportal"
+                  env.aws_region = "us-east-2"
+                  env.record_set = "dekalb-demo-01.dp.edulogvn.com"
+                break
+                case 'ApolloDekalbGA-02':
+                  env.instance_ID = APOLLODEKALBGA_02_ID
+                  env.aws_profile = "driverportal"
+                  env.aws_region = "us-east-2"
+                  env.record_set = "dekalb-demo-02.dp.edulogvn.com"
+                break
+                case 'ApolloDekalbGA-03':
+                  env.instance_ID = APOLLODEKALBGA_03_ID
+                  env.aws_profile = "driverportal"
+                  env.aws_region = "us-east-2"
+                  env.record_set = "dekalb-demo-03.dp.edulogvn.com"
+                break
+                case 'ApolloDekalbGA-04-(Galactus)':
+                  env.instance_ID = APOLLODEKALBGA_04_ID
+                  env.aws_profile = "driverportal"
+                  env.aws_region = "us-east-2"
+                  env.record_set = "dekalb-demo-04.dp.edulogvn.com"
+                break
+                case 'vbcloud.karrostech.net':
+                  env.instance_ID = VBCLOUD_ID
+                  env.aws_profile = "driverportal"
+                  env.aws_region = "us-east-2"
+                  env.record_set = "vbcloud.karrostech.net"
+                break                
+              }
+
+              switch(Instance_Action) {
+                // Case == Start
+                case 'start':
+                  echo "==> Start ${Instance_Name} BE instance"
+                  sh "aws ec2 start-instances --instance-ids ${instance_ID} --region ${aws_region} --profile ${aws_profile}"
+                  // Update Public IP to DNS record
+                  sleep 10 // seconds
+                  env.instance_IP = sh(script: 'aws ec2 describe-instances --instance-ids ${instance_ID} --region ${aws_region} --query "Reservations[].Instances[].PublicIpAddress" --profile ${aws_profile} --output text', returnStdout: true).trim()
+                  sh ('chmod +x ./scripts/bash/update_publicip_route53_record.sh')
+                  echo "==> New instance IP is: ${instance_IP}"
+                  sh ('./scripts/bash/update_publicip_route53_record.sh ${ZONEID} ${record_set} ${instance_IP} ${aws_profile}')
+                  echo "==> Please wait about 5 minutes for instance initialization steps"
+                  echo "==> Then can login to the instance ${Instance_Name} with the DNS: ${record_set}"
+                break
+
+                // Case == Stop 
+                case 'stop':
+                  echo "==> Stop ${Instance_Name} BE instance"
+                  sh "aws ec2 stop-instances --instance-ids ${instance_ID} --region ${aws_region} --profile ${aws_profile}"
+                break
+
+                // Case == Get_Status
+                case 'get_status':
+                  instance_status = sh(script: 'aws ec2 describe-instances --instance-ids ${instance_ID} --region ${aws_region} --query "Reservations[].Instances[].State[].Name" --profile ${aws_profile} --output text', returnStdout: true).trim()
+                  echo "==> ${Instance_Name} BE instance is ${instance_status}"
+                break
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  post {
+    always {
+      echo "=> Clean Workspace after run"
+      cleanWs()
+    }
+    success {
+      echo "==> Build Success"
+    }
+    failure {
+      echo "==> Build Failure"
+    }
+  }
+}

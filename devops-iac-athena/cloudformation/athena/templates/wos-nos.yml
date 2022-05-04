@@ -1,0 +1,127 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena WOS and NOS Template
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+  KeyPairName:
+    Description: Instance KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: "athena-devops"
+  WOSNOSAMIId:
+    Description: "WOS-NOS Services Base/Release AMI"
+    Type: AWS::EC2::Image::Id
+    Default: "ami-0b4740abb31783e66"
+  WOSNOSInstanceType:
+    Description: "WOS-NOS Instance Type"
+    Type: String
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+    Default: t3.large
+    ConstraintDescription: Choose an instance type.
+  WOSNOSSecurityGroup:
+    Description: WOS-NOS Instance Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  ManagementSecurityGroup:
+    Description: AWS SSM Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  VPCID:
+    Description: ID of the VPC you are deploying into (e.g., vpc-0343606e).
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Description: Private Subnet for WOS-NOS instance
+    Type: AWS::EC2::Subnet::Id
+  RDSEndpoint:
+    Description: RDS PostgreSQL Endpoint
+    Type: String
+  SRID:
+    Description: SRID for WOS Service
+    Type: String
+    Default: "2284"
+  DBSchema:
+    Description: DB Schema used for WOS Service
+    Type: String
+    AllowedValues:
+      - geo_plan
+      - geo_live
+    Default: geo_plan
+  MetricEnable:
+    Description: MetricEnable for WOS Service
+    Type: String
+    AllowedValues:
+      - "0"
+      - "1"
+    Default: "0"
+Resources:
+  WosNosInstance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            "C:\\Athena\\opt\\edulognt.cfg":
+              content: !Sub |
+                [ASSIGN]
+                ROOT=c:\athena\opt
+                DYN=c:\athena\opt
+                OPT=c:\athena\opt\logs
+                PAR=c:\athena\opt
+
+                [EXECUTABLES]
+                DLLPATH=c:\athena\opt\bin
+
+                [SQLSERVER]
+                DRIVER={PostgreSQL ANSI}
+                SERVER=${RDSEndpoint}
+                DATABASE=Athena
+                TRUSTED_CONNECTION=yes
+                PORT=5432
+                Uid=edulog
+                Pwd=edul0g
+
+                [OPTSETTINGS]
+                SRID=${SRID}
+                MetricEnable=${MetricEnable}
+                SCHEMA=${DBSchema}
+                GeoSource=3
+                OPTMODE=0
+    Properties:
+      InstanceType: !Ref WOSNOSInstanceType
+      ImageId: !Ref WOSNOSAMIId
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref WOSNOSSecurityGroup
+        - !Ref ManagementSecurityGroup
+      KeyName: !Ref KeyPairName
+      UserData:
+        Fn::Base64: !Sub |
+          <powershell>
+          $LASTEXITCODE=0
+          cfn-init.exe -s ${AWS::StackId} -r WosNosInstance --region ${AWS::Region}
+          New-Item -Path "C:\" -Name userdata -ItemType directory
+          cfn-signal.exe -e $LASTEXITCODE --stack ${AWS::StackId} --resource WosNosInstance --region ${AWS::Region}
+
+          C:\Athena\bin\wosnos-startup.ps1
+          </powershell>
+          <persist>true</persist>
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-instance
+        - Key: project
+          Value: athena
+        - Key: author
+          Value: devops
+        - Key: tenant
+          Value: !Ref Tenant
+        - Key: type
+          Value: wosnos
+Outputs:
+  PrivateIp:
+    Description: The Private IP Address of WOS/NOS Instance
+    Value: !GetAtt WosNosInstance.PrivateIp
+  InstanceID:
+    Description: The Instance ID
+    Value: !Ref WosNosInstance

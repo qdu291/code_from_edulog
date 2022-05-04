@@ -1,0 +1,14 @@
+[Unit]
+Description=Athena PlannedRollover Service
+After=network.target
+
+[Service]
+ExecStartPre=/bin/sleep 5
+Type=simple
+EnvironmentFile=/opt/athena/env/athena.env
+ExecStart=/opt/athena/run/plannedrollover.sh
+User=root
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

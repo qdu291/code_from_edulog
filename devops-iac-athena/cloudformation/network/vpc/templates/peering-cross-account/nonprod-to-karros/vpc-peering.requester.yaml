@@ -1,0 +1,94 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Source VPC Peering Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Requester Peering Configuration
+        Parameters:
+          - ReqVpcStackName
+      - Label:
+          default: Accepter Peering Configuration
+        Parameters:
+          - PeerVPCAccountId
+          - PeerVPCRegion
+          - PeerVPCId
+          - PeerVPCCIDR
+          - PeerRoleArn
+    ParameterLabels:
+      ReqVpcStackName:
+        default: "Requester VPC Stack Name"
+      PeerVPCAccountId:
+        default: "Accepter AWS AccountId"
+      PeerVPCRegion:
+        default: "Accepter AWS Region of VPC"
+      PeerVPCId:
+        default: "Accepter VPC Id"
+      PeerVPCCIDR:
+        default: "Accepter VPC CIDR"
+      PeerRoleArn:
+        default: "Accepter VPC Peering Role"
+Parameters:
+  # Requester
+  ReqVpcStackName:
+    Type: String
+    Description: Source VPC Stack Name
+  # Accepter
+  PeerVPCAccountId:
+    Type: String
+    Description: Accepter AWS AccountID
+  PeerVPCRegion:
+    Type: String
+    Description: Accepter VPC Region
+  PeerVPCId:
+    Type: String
+    Description: Accepter VPC ID
+  PeerVPCCIDR:
+    Type: String
+    Description: Accepter VPC CIDR
+  PeerRoleArn:
+    Type: String
+    Description: Accepter VPC Peering Role
+Resources:
+  # VPC Peering
+  vpcPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ${ReqVpcStackName}-VPCID
+      PeerOwnerId: !Ref PeerVPCAccountId
+      PeerRegion: !Ref PeerVPCRegion
+      PeerVpcId: !Ref PeerVPCId
+      PeerRoleArn: !Ref PeerRoleArn
+      Tags:
+        - Key: Name
+          Value: AthNonProdPeerKarros
+        - Key: project
+          Value: athena
+  peerSourcePrivateSubnet1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${ReqVpcStackName}-PrivateSubnet1RouteTable
+      DestinationCidrBlock: !Ref PeerVPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+  peerSourcePrivateSubnet2Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${ReqVpcStackName}-PrivateSubnet2RouteTable
+      DestinationCidrBlock: !Ref PeerVPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+  peerSourcePrivateSubnet3Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${ReqVpcStackName}-PrivateSubnet3RouteTable
+      DestinationCidrBlock: !Ref PeerVPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+Outputs:
+  VpcPeeringConnectionId:
+    Description: VPC Peering Connection Id
+    Value: !Ref vpcPeeringConnection

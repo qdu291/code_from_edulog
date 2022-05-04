@@ -1,0 +1,31 @@
+{
+    "name": "athena-chiefleschi-wa-route-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false",
+        "value.converter.schemas.enable": "false",
+        "internal.key.converter": "org.apache.kafka.connect.storage.StringConverter",
+        "internal.value..converter": "org.apache.kafka.connect.json.JsonConverter",
+        "internal.key.converter.schemas.enable": "false",
+        "internal.value.converter.schemas.enable": "false",
+        "plugin.name": "wal2json_rds_streaming",
+        "slot.name": "route",
+        "slot.drop.on.stop": "true",
+        "heartbeat.interval.ms": "300000",
+        "heartbeat.action.query":"TRUNCATE debezium_temp_table;",
+        "database.server.name": "athena-chiefleschi-wa-rds",
+        "database.hostname": "athena-chiefleschi-wa-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com",
+        "database.port": "5432",
+        "database.user": "edulog",
+        "database.password": "edul0g",
+        "database.dbname": "Athena",
+        "table.whitelist": "(.*).route",
+        "transforms": "Reroute",
+        "transforms.Reroute.type": "io.debezium.transforms.ByLogicalTableRouter",
+        "transforms.Reroute.topic.regex": "athena-chiefleschi-wa-rds.(.*)",
+        "transforms.Reroute.topic.replacement": "chiefleschi-wa-athena-route-changes",
+        "snapshot.mode": "never"
+    }
+}

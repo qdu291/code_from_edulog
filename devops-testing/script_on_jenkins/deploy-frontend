@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Check variable
+if [ $# -ne 2 ]; then
+    echo $0: usage: deploy-backend tenant fe_domain
+    exit 1
+fi
+
+tenant=$1
+fe_domain=$2
+
+# Deploy Athena Frontend to S3
+# tenant: hallettsville
+# fe_domain: karrostech.io
+src_dir="/opt/athena/frontend/dist"
+s3_bucket="athena-${tenant}.${fe_domain}"
+
+# clean up bucket
+aws s3 rm s3://$s3_bucket --recursive
+cd $src_dir
+aws s3 cp --acl public-read --recursive . s3://$s3_bucket/
+

@@ -1,0 +1,26 @@
+
+resource "aws_db_instance" "athena_rds" {
+  identifier                = "athena-k8s-rds"
+  allocated_storage         = 50
+  max_allocated_storage     = 100
+  engine                    = "postgres"
+  engine_version            = "12.5"
+  instance_class            = "db.t3.small"
+  name                      = "athena-k8s-rds"
+  username                  = "edulog"
+  password                  = "rU18iWV4qxKU"
+  snapshot_identifier       = "${var.db_snapshot_id}"
+#   vpc_security_group_ids    = ["${var.security_group_id}"]
+  db_subnet_group_name      = aws_db_subnet_group.athena_rds_subnet_group.name
+#   parameter_group_name = "default.mysql5.7"
+  skip_final_snapshot       = true
+}
+
+resource "aws_db_subnet_group" "athena_rds_subnet_group" {
+  name       = "main"
+  subnet_ids = [module.vpc.private_subnets.0, module.vpc.private_subnets.1]
+
+  tags = {
+    Name = "Athena DB subnet group"
+  }
+}

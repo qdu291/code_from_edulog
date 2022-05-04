@@ -1,0 +1,299 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena Cache & Queue Template
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+  CQDomain:
+    Description: Domain to be used for CQ Instance
+    Type: String
+  CQHostedZoneId:
+    Description: Route53 Hosted Zone for CQ
+    Type: String
+  KeyPairName:
+    Description: Instance KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+  CQAMIID:
+    Description: Cache&Queue Base AMI
+    Type: AWS::EC2::Image::Id
+  CQInstanceType:
+    Description: Cache&Queue Instance Type
+    Type: String
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+    ConstraintDescription: Choose an instance type.
+  CQASGMinSize:
+    Description: Minimum No of Cache&Queue instances
+    Type: Number
+  CQASGMaxSize:
+    Description: Maximum No of Cache&Queue instances
+    Type: Number
+  CQASGDesiredCapacity:
+    Description: "Desired No of Cache&Queue instances"
+    Type: Number
+  CQSecurityGroup:
+    Description: Cache&Queue Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  ManagementSecurityGroup:
+    Description: AWS SSM Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  VPCID:
+    Description: ID of the VPC you are deploying into (e.g., vpc-0343606e).
+    Type: AWS::EC2::VPC::Id
+  Subnet1ID:
+    Description: The ID of the 1st private subnet.
+    Type: AWS::EC2::Subnet::Id
+  Subnet2ID:
+    Description: The ID of the 2nd private subnet.
+    Type: AWS::EC2::Subnet::Id
+  CQSNSTopic:
+    Description: The ARN of SNS Topic to send notification for alert when CQ instance launched.
+    Type: String
+Resources:
+  # CloudWatchInstanceStart:
+  #   DependsOn:
+  #     - CQRoute53
+  #   Type: AWS::Events::Rule
+  #   Properties:
+  #     Description: >
+  #       Event to be used as a triger for lambda function to attach ip address of CQ instance to internal dns record
+  #     EventPattern:
+  #       source:
+  #         - aws.ec2
+  #       detail-type:
+  #         - EC2 Instance State-change Notification
+  #       detail:
+  #         state:
+  #           - "running"
+  #     State: ENABLED
+  #     Targets:
+  #       - Arn:
+  #           Fn::GetAtt:
+  #             - "CQRoute53"
+  #             - "Arn"
+  #         Id: !Ref CQRoute53
+  # CQRoute53:
+  #   Type: AWS::Lambda::Function
+  #   Properties:
+  #     Environment:
+  #       Variables:
+  #         CQ_NAME: !Sub ${AWS::StackName}-instance
+  #     Code:
+  #       ZipFile: !Sub |
+  #         import os
+  #         import boto3
+
+  #         def lambda_handler(event, context):
+  #           thisInstanceID = event['detail']['instance-id']
+  #           retVal = get_instance_ip(thisInstanceID)
+  #           privateIP = ""
+
+  #           if not retVal:
+  #             return
+  #           else:
+  #             privateIP = retVal
+  #             return create_record(privateIP)
+
+  #         def get_instance_ip(EC2InstanceId):
+  #           ec2 = boto3.resource('ec2')
+  #           ec2instance = ec2.Instance(EC2InstanceId)
+  #           for tags in ec2instance.tags:
+  #             if tags["Key"] == 'Name':
+  #               instanceName = tags["Value"]
+  #               print("*** INSTANCE NAME***")
+  #               print(instanceName)
+  #               print(os.environ['CQ_NAME'])
+  #               if instanceName != os.environ['CQ_NAME']:
+  #                 return "False"
+            
+  #           return ec2instance.private_ip_address
+
+  #         def create_record(privateIP):
+  #           route53 = boto3.client('route53')
+  #           HOSTED_ZONE_ID = "${CQHostedZoneId}"
+
+  #           records = []
+  #           action = 'UPSERT'
+
+  #           records.append({'Value': privateIP})
+            
+  #           dns_changes = {
+  #             'Changes': [
+  #               {
+  #                 'Action': action,
+  #                 'ResourceRecordSet': {
+  #                   'Name': "cq-${Tenant}.${CQDomain}",
+  #                   'Type': 'A',
+  #                   'Weight': 1,
+  #                   'SetIdentifier': 'Weighted',
+  #                   'ResourceRecords': records,
+  #                   'TTL': 300
+  #                 }
+  #               }
+  #             ]
+  #           }
+
+  #           print("***DNS CHANGES***")
+  #           print(dns_changes)
+
+  #           response = route53.change_resource_record_sets(HostedZoneId=HOSTED_ZONE_ID,ChangeBatch=dns_changes)
+
+  #           return {'status':response['ChangeInfo']['Status']}
+
+  #     Handler: index.lambda_handler
+  #     Runtime: python3.8
+  #     Timeout: 10
+  #     Role: !GetAtt
+  #       - LERCQRoute53
+  #       - Arn
+  # LERCQRoute53:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: 2012-10-17
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service:
+  #               - lambda.amazonaws.com
+  #           Action:
+  #             - sts:AssumeRole
+  #     Path: /
+  #     Policies:
+  #       - PolicyName: !Sub "${AWS::StackName}-LERCQRoute53"
+  #         PolicyDocument:
+  #           Version: 2012-10-17
+  #           Statement:
+  #             - Action:
+  #                 - logs:CreateLogGroup
+  #                 - logs:CreateLogStream
+  #                 - logs:PutLogEvents
+  #               Resource:
+  #                 - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-CQRoute53-*"
+  #               Effect: Allow
+  #             - Action:
+  #                 - route53:ChangeResourceRecordSets
+  #                 - route53:ListResourceRecordSets
+  #               Resource: !Sub "arn:aws:route53:::hostedzone/${CQHostedZoneId}"
+  #               Effect: Allow
+  #             - Action:
+  #                 - ec2:DescribeInstances
+  #               Resource: "*"
+  #               Effect: Allow
+  # AssignCQRoute53FunctionPermission:
+  #   DependsOn: CQRoute53
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     FunctionName: !Ref CQRoute53
+  #     Action: lambda:InvokeFunction
+  #     Principal: events.amazonaws.com
+  #     SourceArn: !GetAtt CloudWatchInstanceStart.Arn
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-launchtemplate
+      LaunchTemplateData:
+        InstanceType: !Ref CQInstanceType
+        ImageId: !Ref CQAMIID
+        IamInstanceProfile:
+          Arn: !GetAtt InstanceProfile.Arn
+        KeyName: !Ref KeyPairName
+        SecurityGroupIds:
+          - !Ref CQSecurityGroup
+          - !Ref ManagementSecurityGroup
+        UserData: !Base64
+          Fn::Sub: |
+            #!/bin/bash
+            rabbitmqctl add_user edulog edul0g
+            rabbitmqctl set_permissions -p / edulog ".*" ".*" ".*"
+            rabbitmqctl set_user_tags edulog administrator
+  PublicALBTargetGroupWS:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /api/healthchecks/node
+      Matcher:
+        HttpCode: 200,401
+      HealthCheckPort: 15672
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 15674
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPCID
+  AutoScaling:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: !Ref CQASGMinSize
+      MaxSize: !Ref CQASGMaxSize
+      DesiredCapacity: !Ref CQASGDesiredCapacity
+      TargetGroupARNs:
+        - !Ref PublicALBTargetGroupWS
+      VPCZoneIdentifier:
+        - !Ref Subnet1ID
+        - !Ref Subnet2ID
+      NotificationConfigurations: 
+        - NotificationTypes: ["autoscaling:EC2_INSTANCE_LAUNCH"]
+          TopicARN: !Ref CQSNSTopic
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-instance
+          PropagateAtLaunch: true
+        - Key: project
+          Value: athena
+          PropagateAtLaunch: true
+        - Key: author
+          Value: ktvn-devops
+          PropagateAtLaunch: true
+        - Key: environment
+          Value: !Ref Tenant
+          PropagateAtLaunch: true
+        - Key: type
+          Value: cache-queue
+          PropagateAtLaunch: true
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: "1"
+        MaxBatchSize: "1"
+        PauseTime: "PT2M5S"
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
+Outputs:
+  PublicALBTargetGroupWS:
+    Description: The URL of the Public ALB Target Group for working with WebSocket
+    Value: !Ref PublicALBTargetGroupWS
+  CQASGName:
+    Description: Cache-Queue AutoScaling Group Name
+    Value: !Ref AutoScaling

@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Athena Security Groups
+Parameters:
+  VPCID:
+    Description:
+      VPC ID of your existing Virtual Private Cloud (VPC) where you want
+      to depoy Athena.
+    Type: AWS::EC2::VPC::Id
+  VPCCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Description: The CIDR block for VPC
+    Type: String
+  ManagementSG:
+    Description: The Security Group that used to manage athena project
+    Type: AWS::EC2::SecurityGroup::Id
+Resources:
+  # Athena PostgreSQL RDS SG
+  PostgreSQLSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena PostgreSQL Database Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BackendSG
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref ManagementSG
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref VPCCIDR
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 10.11.0.0/16
+
+  # Athena Production Cache & Queue SG
+  CacheQueueSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena Cache & Queue Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        # Allow SSM Manage Instance in Private Subnet
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VPCCIDR
+        # MongoDB
+        - IpProtocol: tcp
+          FromPort: 27017
+          ToPort: 27017
+          SourceSecurityGroupId: !Ref BackendSG
+        # RabbitMQ
+        - IpProtocol: tcp
+          FromPort: 5672
+          ToPort: 5672
+          SourceSecurityGroupId: !Ref BackendSG
+        # RabbitMQ WebSocket Admin Site
+        - IpProtocol: tcp
+          FromPort: 15672
+          ToPort: 15672
+          SourceSecurityGroupId: !Ref BackendSG
+        # RabbitMQ WebSocket Admin Site
+        - IpProtocol: tcp
+          FromPort: 15672
+          ToPort: 15672
+          CidrIp: !Ref VPCCIDR
+        # RabbitMQ WebSocket
+        - IpProtocol: tcp
+          FromPort: 15674
+          ToPort: 15674
+          SourceSecurityGroupId: !Ref BackendSG
+        # RabbitMQ WebSocket
+        - IpProtocol: tcp
+          FromPort: 15674
+          ToPort: 15674
+          SourceSecurityGroupId: !Ref BackendALBSG
+        # For RabbitMQ Health check
+        - IpProtocol: tcp
+          FromPort: 15672
+          ToPort: 15672
+          SourceSecurityGroupId: !Ref BackendALBSG
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref ManagementSG
+
+  BackendSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena Backend Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        # Allow SSM Manage Instance in private subnets
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VPCCIDR
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !GetAtt BackendALBSG.GroupId
+        - IpProtocol: tcp
+          FromPort: 8090
+          ToPort: 8090
+          SourceSecurityGroupId: !GetAtt BackendALBSG.GroupId
+        - IpProtocol: tcp
+          FromPort: 8070
+          ToPort: 8070
+          SourceSecurityGroupId: !GetAtt BackendALBSG.GroupId
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref ManagementSG
+
+  BackendALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena Backend Public ALB Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+  WOSNOSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena WOS NOS Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8089
+          ToPort: 8089
+          SourceSecurityGroupId: !Ref BackendSG
+        - IpProtocol: tcp
+          FromPort: 8801
+          ToPort: 8810
+          SourceSecurityGroupId: !Ref BackendSG
+        - IpProtocol: tcp
+          FromPort: 8901
+          ToPort: 8910
+          SourceSecurityGroupId: !Ref BackendSG
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: !Ref VPCCIDR
+  DCSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena Debezium Connector Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref VPCCIDR
+  GSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena GeoServer Security Group
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref VPCCIDR
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref VPCCIDR
+Outputs:
+  PostgreSQLSG:
+    Description: Athena PostgreSQL RDS Security Group
+    Value: !Ref PostgreSQLSG
+  CacheQueueSG:
+    Description: Athena Database Security Group
+    Value: !Ref CacheQueueSG
+  BackendSG:
+    Description: Athena Backend Security Group
+    Value: !Ref BackendSG
+  BackendALBSG:
+    Description: Athena Backend ALB Security Group
+    Value: !Ref BackendALBSG
+  DebeziumConnectorSG:
+    Description: Security Group for Debezium Connector
+    Value: !Ref DCSecurityGroup
+  WOSNOSSG:
+    Description: Security Group for WOS, NOS
+    Value: !Ref WOSNOSSecurityGroup
+  GeoServerSG:
+    Description: Security Group for GeoServer
+    Value: !Ref GSSecurityGroup

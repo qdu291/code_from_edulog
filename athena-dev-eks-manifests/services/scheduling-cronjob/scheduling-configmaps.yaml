@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scheduling-site-list
+  namespace: default
+data:
+  scheduling-vn: "vb-eks,test-multi-midland"
+  scheduling-us: "multi-vb,multi-winchester"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-job
+data:
+   scale-job: |
+    #!/bin/bash
+    siteList=$ATHENA_SITES
+    action=$1
+    # List out Sites
+    IFS="," read -r -a arrList <<< "$siteList"
+
+    # Determine start/stop action
+    if [ "$action" == "stop" ]; then
+      rep_no=0
+    else
+      rep_no=1
+    fi
+
+    #Scale services
+    echo "My array: ${arrList[@]}"
+    echo "Number of elements in the array: ${#arrList[@]}"
+
+    for element in "${arrList[@]}"
+    do
+      echo "Site: $element"
+      echo "Action: $action"
+      kubectl scale deploy -l scheduling=vn --replicas=$rep_no -n $element
+    done

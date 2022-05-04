@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: vb-eks
+  name: specialneeds
+  labels:
+    svc: specialneeds
+spec:
+  selector:
+    app: specialneeds
+  ports:
+  - protocol: TCP
+    port: 8078
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: vb-eks
+  name: specialneeds
+  labels:
+    name: specialneeds
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: specialneeds
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: specialneeds
+        app: specialneeds
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/specialneeds:1.46.3
+        name: specialneeds
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args: 
+        - >
+          . /home/athena/athena.env && java
+          -jar -XX:+UseG1GC -Xms256m -Xmx512m /home/athena/app.jar 
+          --special-need.database.server=${DB_HOST}
+        ports:
+        - name: http
+          containerPort: 8078
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Debezium Distributed Workers Template
+Parameters:
+  VPCStackName:
+    Type: String
+    Description: The VPC that Athena Project resources will run on
+    Default: athena-nonprod-vpc
+  Domain:
+    Description: Root Domain which hosted in Route53
+    Type: String
+    Default: athena-nonprod.com
+  HostedZoneId:
+    Description: Route53 Hosted Zone for Backend
+    Type: String
+    Default: Z0554033189HKTXE7UEFR
+  SSLCertificateId:
+    Description: The ARN of the SSL certificate to use for the Debezium Workers ALB
+    Type: String
+    Default: arn:aws:acm:us-east-2:696952606624:certificate/99a317f8-79c9-476c-b2cd-7882c1640778
+  ClusterName:
+    Description: ECS Cluster Name for Debezium Distributed Cluster
+    Type: String
+    Default: AthenaDebeziumDistributedWorkers
+  DWImageUrl:
+    Type: String
+    Description: ECR Image URI - registry/repository:tag
+    Default: debezium/connect:1.2
+  DWContainerPort:
+    Type: Number
+    Description: What port number the application inside the docker container is binding to
+    Default: 8083
+  DWContainerCpu:
+    Type: Number
+    Description: How much CPU to give the container. 1024 is 1 CPU
+    Default: 1024
+  DWContainerMemory:
+    Type: Number
+    Description: How much memory in megabytes to give the container
+    Default: 2048
+  DWDesiredCount:
+    Type: Number
+    Description: How many copies of the service task to run
+    Default: 1
+  BootstrapServers:
+    Type: String
+    Description: Kafka Bootstrap Servers for Debezium Workers to work on
+    Default: b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+  ConfigsTopic:
+    Type: String
+    Description: Kafka Topic for Debezium Workers Configs Storage
+    Default: dbz-dev-config
+  StatusesTopic:
+    Type: String
+    Description: Kafka Topic for Debezium Workers Statuses
+    Default: dbz-dev-status
+  OffsetsTopic:
+    Type: String
+    Description: Kafka Topic for Debezium Workers Statuses
+    Default: dbz-dev-offset
+  GroupId:
+    Type: String
+    Description: Kafka Worker Group for Debezium Workers Group
+    Default: dbz-dev-worker-group
+Resources:
+  DWCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+  DWALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Debezium Workers ALB Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${VPCStackName}-VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        # - IpProtocol: tcp
+        #   FromPort: 22
+        #   ToPort: 22
+        #   SourceSecurityGroupId: !Ref ManagementSG
+  DWContainerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Athena Debezium Workers Container Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${VPCStackName}-VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8083
+          ToPort: 8083
+          SourceSecurityGroupId: !GetAtt DWALBSG.GroupId
+  DWALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - Fn::ImportValue: !Sub ${VPCStackName}-PublicSubnet1ID
+        - Fn::ImportValue: !Sub ${VPCStackName}-PublicSubnet2ID
+      SecurityGroups:
+        - !Ref DWALBSG
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-publicalb
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: debezium-workers
+  ALBTargetGroupHTTP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      TargetType: ip
+      Port: 8083
+      Protocol: HTTP
+      VpcId:
+        Fn::ImportValue: !Sub ${VPCStackName}-VPCID
+      Matcher:
+        HttpCode: 200
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckPort: 8083
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+  ALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateId
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroupHTTP
+      LoadBalancerArn: !Ref DWALB
+      Port: 443
+      Protocol: HTTPS
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /edulog/${AWS::StackName}/debezium-workers
+  DWIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: author
+          Value: devops
+        - Key: service
+          Value: debezium-workers
+        - Key: project
+          Value: athena
+  DWECSTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: !Ref DWContainerCpu
+      Memory: !Ref DWContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt DWIamRole.Arn
+      TaskRoleArn: !GetAtt DWIamRole.Arn
+      ContainerDefinitions:
+        - Name: debezium-worker
+          Cpu: !Ref DWContainerCpu
+          Memory: !Ref DWContainerMemory
+          Image: !Ref DWImageUrl
+          PortMappings:
+            - ContainerPort: !Ref DWContainerPort
+          Environment:
+            - Name: BOOTSTRAP_SERVERS
+              Value: !Ref BootstrapServers
+            - Name: CONFIG_STORAGE_TOPIC
+              Value: !Ref ConfigsTopic
+            - Name: DBZ_STATUSES_TOPIC
+              Value: !Ref StatusesTopic
+            - Name: OFFSET_STORAGE_TOPIC
+              Value: !Ref OffsetsTopic
+            - Name: GROUP_ID
+              Value: !Ref GroupId
+            - Name: INTERNAL_KEY_CONVERTER
+              Value: org.apache.kafka.connect.storage.StringConverter
+            - Name: INTERNAL_KEY_CONVERTER_SCHEMAS_ENABLE
+              Value: false
+            - Name: INTERNAL_VALUE_CONVERTER
+              Value: org.apache.kafka.connect.json.JsonConverter
+            - Name: INTERNAL_VALUE_CONVERTER_SCHEMAS_ENABLE
+              Value: false
+            - Name: KEY_CONVERTER
+              Value: org.apache.kafka.connect.storage.StringConverter
+            - Name: KEY_CONVERTER_SCHEMAS_ENABLE
+              Value: false
+            - Name: VALUE_CONVERTER
+              Value: org.apache.kafka.connect.json.JsonConverter
+            - Name: VALUE_CONVERTER_SCHEMAS_ENABLE
+              Value: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /edulog/${AWS::StackName}/debezium-workers
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: ecs
+  DWECSService:
+    DependsOn: ALBListenerHTTPS
+    Type: AWS::ECS::Service
+    Properties:
+      LoadBalancers:
+        - ContainerName: debezium-worker
+          ContainerPort: !Ref DWContainerPort
+          TargetGroupArn: !Ref ALBTargetGroupHTTP
+      ServiceName: !Sub ${AWS::StackName}-service
+      Cluster: !Ref DWCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DWDesiredCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref DWContainerSG
+          Subnets:
+            - Fn::ImportValue: !Sub ${VPCStackName}-PrivateSubnet1ID
+            - Fn::ImportValue: !Sub ${VPCStackName}-PrivateSubnet2ID
+      TaskDefinition: !Ref DWECSTask
+  DWRoute53Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub debezium.${Domain}
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt DWALB.CanonicalHostedZoneID
+        DNSName: !GetAtt DWALB.DNSName
+
+Outputs:
+  DWCluster:
+    Description: Name of Debezium WorkerECS Cluster
+    Value: !Ref DWCluster
+  InternalALBURL:
+    Description: Debezium Workers ALB URL
+    Value: !Sub https://${DWALB.DNSName}
+  DWURL:
+    Description: Debezium Workers URL
+    Value: !Sub https://${DWRoute53Record}

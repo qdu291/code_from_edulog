@@ -1,0 +1,27 @@
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: resource-limit-range
+  namespace: develop-eks
+spec:
+  limits:
+  - default:
+      memory: 2048Mi
+      cpu: 500m
+    defaultRequest:
+      memory: 1024Mi
+      cpu: 200m
+    type: Container
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resources-quota
+  namespace: develop-eks
+spec:
+  hard:
+    requests.cpu: "5" 
+    requests.memory: 24Gi 
+    limits.cpu: "10.5" 
+    limits.memory: 38Gi 

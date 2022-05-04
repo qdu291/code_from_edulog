@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: vb-eks
+  name: routingservice
+  labels:
+    svc: routingservice
+spec:
+  selector:
+    app: routingservice
+  ports:
+  - protocol: TCP
+    port: 8081
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: vb-eks
+  name: routingservice
+  labels:
+    name: routingservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: routingservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: routingservice
+        app: routingservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/routingservice:1.46.3
+        name: routingservice
+        command: ["/bin/sh", "-c"]
+        args: 
+        - >
+          . /home/athena/athena.env && java 
+          -Dspring.profiles.active=eks
+          -Dmanagement.context-path=/
+          -Dmanagement.endpoints.web.base-path=/
+          -Dmanagement.endpoints.web.exposure.include="*"
+          -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena
+          -Dspring.rabbitmq.host=${QUEUE_HOST}
+          -Dspring.rabbitmq.username=${QUEUE_USER}
+          -Dspring.rabbitmq.password=${QUEUE_PASS}
+          -Dspring.data.mongodb.host=${CACHE_HOST}
+          -Ddebezium_controller.api.url=${DEBEZIUM_CONTROLLER_API}
+          -Ddebezium_controller.api.key=${DEBEZIUM_CONTROLLER_KEY}
+          -Ddebezium_controller.service_name=${TENANT}
+          -Dathena.env.name=${ENV}
+          -Dathena.tenant.id=${TENANT_ID}
+          -Dopt.host=${NOS_HOST}
+          -Dopt.port=${OPT_PORT}
+          -Dnos.port=${NOS_PORT}
+          -Dvehicleimport.upload.dir=${ATHENA_PATH}/resources/vehicleimport/
+          -Drouting-service.es.url=${ES_URL}
+          -Drouting-service.es.username=${ES_USERNAME}
+          -Drouting-service.es.password=${ES_PASSWORD}
+          -Drouting-service.es.protocol=${ES_PROTOCOL}
+          -Drouting-service.es.connectionTimeout=${ES_CONNECTIONTIMEOUT}
+          -Drouting-service.es.socketTimeout=${ES_SOCKETTIMEOUT}
+          -Drouting-service.es.parallelESCountThreads=${ES_PARALELLESTHREADCOUNT}
+          -Drouting-service.es.port=${ES_PORT}
+          -Drouting-service.es.run.index=${ES_RUN_INDEX}
+          -Drouting-service.es.route.index=${ES_ROUTE_INDEX}
+          -Drouting-service.es.trip.index=${ES_TRIP_INDEX}
+          -Drouting-service.es.snapshot.write.enabled=${ES_SNAPSHOT_ENABLED}
+          -Drouting-service.es.snapshot.write.suppress.errors=${ES_SNAPSHOT_SUPRESS_WRITE_ERRORS}
+          -Drouting-service.es.snapshot.sync.enabled=${ES_SNAPSHOT_ROUTING_WRITE_ENABLED}
+          -jar -XX:+UseG1GC -Xms256m -Xmx2048m /home/athena/app.jar
+        ports:
+        - containerPort:  8081
+          name: routingservice
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 250m
+          limits:
+            memory: 3072Mi
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

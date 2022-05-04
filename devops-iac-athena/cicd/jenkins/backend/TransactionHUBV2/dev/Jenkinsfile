@@ -1,0 +1,86 @@
+// Job Name: ATH-TransactionHUBV2Service-Build-Dev
+pipeline{
+  agent any
+
+  triggers {
+    pollSCM('H/5 * * * *') // poll SCM every 5 minutes
+  }
+
+  environment {
+    ENV = 'dev'
+    SERVICE_NAME = 'TransactionHUBV2'
+    S3_ARTIFACTS = sh(script: 'cat ${JENKINS_HOME}/athena/s3_artifacts_bucket', returnStdout: true).trim()
+
+    // Notification variables
+    // GCHAT_TOKEN = sh(script: 'cat ${JENKINS_HOME}/athena/gchat_room_token', returnStdout: true).trim()
+    GCHAT_TOKEN = 'BRaCr8RhcifcJs2dEK08NiGQP'
+  }
+
+  stages{
+    stage('Checkout') {
+      steps {
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: '*/dev']],
+            userRemoteConfigs: [[
+              url: 'git@github.com:eduloginc/Athena.git', 
+              credentialsId: 'eduloginc-git-tankhuu'
+              ]]
+          ])
+          // Set env GIT_COMMIT & SHORT_COMMIT & BUILD_VERSION
+          env.GIT_COMMIT = scmVars.GIT_COMMIT
+          env.SHORT_COMMIT = scmVars.GIT_COMMIT.substring(0,7)
+        }
+      }
+    }
+    stage('Versioning') {
+      steps {
+        echo "==> Get build_version"
+        script {
+          dir('Source/Routing.Microservices/TransactionHUBV2') {
+            def pom_version = sh(script: 'mvn -q -Dexec.executable=\'echo\' -Dexec.args=\'${project.version}\' --non-recursive exec:exec', returnStdout: true).trim()
+            env.POM_VERSION = pom_version
+            env.BUILD_VERSION = "${POM_VERSION}.${BUILD_NUMBER}.${GIT_COMMIT}"
+          }
+        }
+        echo "==> Build Services with build_version: ${env.BUILD_VERSION}"
+        dir('Source/Routing.Microservices/TransactionHUBV2') {
+          sh "mvn versions:set -DnewVersion=${BUILD_VERSION}"
+        }
+      }
+    }
+    stage('Build TransactionHUBV2') {
+      steps {
+        echo "==> Build Services with build_version: ${env.BUILD_VERSION}"
+        dir('Source/Routing.Microservices/TransactionHUBV2') {
+          sh "mvn clean install -DskipTests -e -U"
+        }
+      }
+    }
+    stage('Upload Artifacts') {
+      steps {
+        echo "==> Upload TransactionHUBV2-${env.BUILD_VERSION} jar file to S3"
+        dir('Source/Routing.Microservices/TransactionHUBV2') {
+          sh 'aws s3 cp target/${SERVICE_NAME}-${BUILD_VERSION}.jar s3://${S3_ARTIFACTS}/athena/backend/${SERVICE_NAME}/${ENV}/${SERVICE_NAME}.jar'
+        }
+      }  
+    }
+  }
+post {
+    success {
+    echo "==> Send Git Status Check Success"
+    sh "send-git-status eduloginc Athena ${GIT_COMMIT} ${GIT_STATUS_ACCESS_TOKEN} success ${JOB_BASE_NAME} ${BUILD_NUMBER}"
+    echo "==> Notify to Google Chat Room"
+    hangoutsNotify message: "Environment: ${ENV}\nService: ${SERVICE_NAME}\nBuild: *${currentBuild.result}*\nCommit: ${SHORT_COMMIT}\nDuration: ${currentBuild.durationString}",
+        token: "${GCHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+    echo "==> Send Git Status Check Failure"
+    sh "send-git-status eduloginc Athena ${GIT_COMMIT} ${GIT_STATUS_ACCESS_TOKEN} failure ${JOB_BASE_NAME} ${BUILD_NUMBER}"
+    echo "==> Notify to Google Chat Room"
+    hangoutsNotify message: "Environment: ${ENV}\nService: ${SERVICE_NAME}\nBuild: *${currentBuild.result}*\nCommit: ${SHORT_COMMIT}\nDuration: ${currentBuild.durationString}",
+        token: "${GCHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

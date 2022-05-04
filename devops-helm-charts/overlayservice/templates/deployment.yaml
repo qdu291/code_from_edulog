@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Chart.Name }}
+  labels:
+    name: {{ .Chart.Name }}
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        name: {{ .Chart.Name }}
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - >-
+            . /home/athena/athena.env && java -Dspring.profiles.active=eks
+            -Dserver.tomcat.mbeanregistry.enabled=true
+            -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+            --overlay.database.server=${DB_HOST}
+            --geocode.database.server=${DB_HOST}
+        ports:
+        - containerPort: {{.Values.service.port}}
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+          requests:
+            cpu: 200m
+            memory: "1024Mi"
+          limits:
+            cpu: 500m
+            memory: "2048Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 60
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

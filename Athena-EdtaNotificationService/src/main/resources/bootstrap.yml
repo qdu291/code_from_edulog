@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: EDTANOTIFICATIONSERVICE
+  cloud:
+    config:
+      uri: http://config.karrostech.net
+
+health:
+  config:
+    enabled: false

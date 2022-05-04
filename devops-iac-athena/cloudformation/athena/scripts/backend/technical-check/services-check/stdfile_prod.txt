@@ -1,0 +1,13 @@
+karros.env=prod
+athena.env.name=prod
+karros.general.url=https://athenagateway-p01-prod.usw1.karrostech.net
+karros.login.url=https://athenagateway-p01-prod.usw1.karrostech.net/api/v1/signin
+karros.keycloak.clientid=athena-backend
+karros.keycloak.clientsecret=2224875d-7c29-430f-8e11-471be0499782
+karros.keycloak.url=https://accounts.karrostech.net/auth/realms/Edulog/protocol/openid-connect/token
+karros.keycloak.logouturl=https://accounts.karrostech.net/auth/realms/Edulog/protocol/openid-connect/logout
+karros.keycloak.forgotpasswordurl=https://accounts.karrostech.net/auth/realms/Edulog/karros-auth/forgot-password
+debezium_controller.api.url=https://hguv82zz19.execute-api.us-east-2.amazonaws.com/prod/controller
+debezium_controller.api.key=mPa6WrTXuR5yhcbRypLQF5qsvN60qHptajbhqTvF
+tenantconfig.api.url=https://athenagateway-p01-prod.usw1.karrostech.net/api/
+karros.api.key=9d6c3f85669a40cd1b1fa4635b049b92bb04c881

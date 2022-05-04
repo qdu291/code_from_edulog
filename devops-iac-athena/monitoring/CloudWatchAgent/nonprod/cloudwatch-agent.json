@@ -1,0 +1,127 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "metrics": {
+    "namespace": "Edulog/Athena",
+    "metrics_collected": {
+      "disk": {
+        "resources": [
+          "/",
+          "/tmp"
+        ],
+        "measurement": [
+          {
+            "name": "free",
+            "rename": "DISK_FREE",
+            "unit": "Gigabytes"
+          },
+          "total",
+          "used"
+        ],
+        "ignore_file_system_types": [
+          "sysfs",
+          "devtmpfs"
+        ],
+        "metrics_collection_interval": 300
+      },
+      "mem": {
+        "measurement": [
+          "mem_used",
+          "mem_cached",
+          "mem_total"
+        ],
+        "metrics_collection_interval": 5
+      }
+    },
+    "append_dimensions": {
+      "ImageId": "${aws:ImageId}",
+      "InstanceId": "${aws:InstanceId}",
+      "InstanceType": "${aws:InstanceType}",
+      "AutoScalingGroupName": "${aws:AutoScalingGroupName}"
+    },
+    "aggregation_dimensions": [
+      [
+        "ImageId"
+      ],
+      [
+        "InstanceId",
+        "InstanceType"
+      ],
+      [
+        "d1"
+      ],
+      []
+    ],
+    "force_flush_interval": 30
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/monit.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/monit",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/gateway.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/gateway",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/txnhub.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/txnhub",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/routing.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/routing",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/geocode.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/geocode",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/edta.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/edta",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/reports.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/reports",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/edta.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/edta",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/ivin.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/ivin",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/aggregator.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/aggregator",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/athena-importing.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/importing",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          },
+          {
+            "file_path": "/logs/reports.log",
+            "log_group_name": "/edulog/athena/chiefleschi-wa-2/reports",
+            "timestamp_format": "%d/%b/%Y:%H:%M:%S %z"
+          }
+        ]
+      }
+    }
+  }
+}

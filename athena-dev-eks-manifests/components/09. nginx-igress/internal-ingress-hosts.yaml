@@ -1,0 +1,93 @@
+#---
+#apiVersion: networking.k8s.io/v1
+#kind: Ingress
+#metadata:
+#  name: argocd-ingress
+#  namespace: argocd
+#  #annotations:
+#  #  kubernetes.io/ingress.class: "nginx"
+#    #nginx.ingress.kubernetes.io/auth-tls-secret:
+#spec:
+#  #ingressClassName: external-nginx
+#  ingressClassName: nginx
+#  rules:
+#  - host: argocd.eks-dev.athena-nonprod.com
+#    http:
+#      paths:
+#      - pathType: Prefix
+#        path: /
+#        backend:
+#          service:
+#            name: argocd-server
+#            port:
+#              number: 80
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: argocd.eks-dev.athena-nonprod.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: kubernetes-dashboard.eks-dev.athena-nonprod.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kubernetes-dashboard
+            port:
+              number: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitor-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: prometheus.eks-dev.athena-nonprod.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-operated
+            port:
+              number: 9090
+  - host: grafana.eks-dev.athena-nonprod.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000

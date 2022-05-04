@@ -1,0 +1,48 @@
+
+profile
+  type: website | queue | nosql | sql
+
+  website:
+    name
+    protocol: http | https
+    type: alive | login
+    endpoint
+    username
+    password
+  
+  queue:
+    name
+    protocol: tcp | ws
+    endpoint
+    username
+    password
+  
+  nosql
+    name
+    protocol: tcp
+    endpoint
+    username
+    password
+    query
+
+  sql
+    name
+    protocol: tcp
+    endpoint
+    username
+    password
+
+functions:
+  check_website
+  check_queue
+  check_nosql
+  check_nosql
+
+
+
+Result: LIST send notify to GoogleChat by Card
+  - profile_name
+      total_checks
+      success
+      failure
+

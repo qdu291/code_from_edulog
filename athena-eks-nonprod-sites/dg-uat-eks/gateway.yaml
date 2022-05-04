@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    svc: gateway
+  annotations:
+    #service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:696952606624:certificate/61dd558a-44cf-42f6-a42a-bff894ae95ca #cert of eks-dev.athena-nonprod.com
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:696952606624:certificate/99a317f8-79c9-476c-b2cd-7882c1640778 #cert of athena-nonprod.com
+    # service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # dns.alpha.kubernetes.io/external: ath-be-demoleg.eks-dev.athena-nonprod.com
+    external-dns.alpha.kubernetes.io/hostname: ath-be-dg-uat-eks.eks-dev.athena-nonprod.com
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 443
+    targetPort: 80
+    protocol: TCP
+    name: https
+  selector:
+    app: gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    name: gateway
+    scheduling: vn
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: gateway
+        app: gateway
+    spec:
+      nodeSelector:
+        nodeType: scheduling-vn
+      tolerations:
+      - effect: NoSchedule
+        operator: Equal
+        key: scheduling
+        value: vn
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/gateway:1.46.3
+        name: gateway
+        command: ["/bin/sh", "-c"]
+        args: 
+          - >-
+            . /home/athena/athena.env && java 
+            -Dspring.profiles.active=eks
+            -Dcom.sun.management.jmxremote=true
+            -Dcom.sun.management.jmxremote.authenticate=false
+            -Dcom.sun.management.jmxremote.ssl=false
+            -Dcom.sun.management.jmxremote.rmi.port=6001
+            -Dspecial-needs.ribbon.listOfServers=http://specialneeds:8078
+            -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+            --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena
+        ports:
+        - containerPort: 80
+          name: gateway
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 250m
+          limits:
+            memory: 1024Mi
+            cpu: 500m
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

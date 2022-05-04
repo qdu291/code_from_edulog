@@ -1,0 +1,2 @@
+**/.terraform
+/non-prod/.terraform/plugins/darwin_amd64/terraform-provider-aws_v3.30.0_x5

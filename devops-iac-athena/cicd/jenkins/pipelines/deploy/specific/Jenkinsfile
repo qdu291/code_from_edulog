@@ -1,0 +1,66 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'ENV', description: 'Environment Name to deploy directly')
+    choice(
+      name: 'SERVICE_NAME', 
+      choices: ['gateway', 'TransactionHUBV2', 'RoutingServer', 'GeoCodeService', 'RoutingMigration', 'DriverTimeAndAttendance', 'IVIN', 'PlannedRollover', 'AggregateService', 'Overlay', 'services', 'ImportService'], 
+      description: 'The Service Build that trigger this job.')
+    string(name: 'BUILD_VERSION', defaultValue: '', description: 'Build Version of Service which is in format {POM_VERSION}.{BUILD_NUMBER}.{GIT_COMMIT}')
+    string(name: 'SHORT_COMMIT', defaultValue: '', description: 'Git Commit in shorten format of Service Build')
+  }
+
+  stages {
+    stage('Deploy services to $ENV Environments') {
+      when {
+        equals expected: 'services', actual: params.SERVICE_NAME
+      }
+      steps {
+        echo "=> Deploy to $ENV Backend Instance"
+        sh '''#!/bin/bash -xe
+          ssh -t $ENV "/usr/local/bin/deploy-services ${BUILD_VERSION}"
+        '''
+      }
+    }
+    stage ('Deploy service ${SERVICE_NAME} to ${ENV} Environment') {
+      when {
+        not {
+          equals expected: 'services', actual: params.SERVICE_NAME
+        }
+      }
+      steps {
+        echo "=> Deploy to $ENV Backend Instance"
+        sh '''#!/bin/bash -xe
+          ssh -t $ENV "/usr/local/bin/deploy-service ${SERVICE_NAME} ${BUILD_VERSION}"
+        '''
+        sh '''#!/bin/bash -xe
+          ssh -t $ENV "/usr/local/bin/apply-service ${SERVICE_NAME}"
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "=> Cleanup Workspace after finished!"
+      cleanWs()
+    }
+    success {
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${BUILD_VERSION}\nService: ${SERVICE_NAME}\nDuration: ${DURATION}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${BUILD_VERSION}\nService: ${SERVICE_NAME}\nDuration: ${DURATION}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

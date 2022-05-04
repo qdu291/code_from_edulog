@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-schedule
+  namespace: default
+  labels:
+    name: test-schedule
+spec:
+  volumes:
+  - name: scale-job
+    configMap:
+      name: scale-job
+      defaultMode: 0777
+  containers:
+  - name: test-schedule
+    image: bitnami/kubectl:latest
+    command: ["sleep", "3600"]
+    env:
+      - name: ATHENA_SITES
+        valueFrom:
+          configMapKeyRef:
+            name: scheduling-site-list
+            key: scheduling-vn
+    volumeMounts:
+      - mountPath: /tmp
+        name: scale-job
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "500m"

@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: multi-tenant
+  name: configserver
+  labels:
+    svc: configserver
+  annotations:
+#    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:696952606624:certificate/99a317f8-79c9-476c-b2cd-7882c1640778
+    # service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    dns.alpha.kubernetes.io/external: configserver.athena-nonprod.com
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: configserver
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: multi-tenant
+  name: configserver
+  labels:
+    name: configserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: configserver
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: configserver
+        app: configserver
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/configserver:latest
+        name: configserver
+        command: ["java"]
+        args: [
+#          "-Dcom.sun.management.jmxremote",
+#          "-Dserver.tomcat.max-threads=500",
+#          "-Dcom.sun.management.jmxremote.authenticate=false",
+#          "-Dcom.sun.management.jmxremote.ssl=false",
+#          "-Dcom.sun.management.jmxremote.port=9099",
+#          "-Dmanagement.security.enabled=false",
+#          "-Dmanagement.context-path=/",
+#          "-DLOG_PATH=/opt/athena/logs",
+#          "-DLOG_FILE=/opt/athena/logs/springConfigServer.log",
+          "-Dserver.port=80",
+          "-jar", "-Xms256m", "-Xmx1024m", "/home/athena/app.jar"]
+        ports:
+        - containerPort: 80
+          name: configserver
+      restartPolicy: Always

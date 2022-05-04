@@ -1,0 +1,49 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: register-commanddistributor
+spec:
+  schedule: "30 1 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            nodeType: scheduling-vn
+          tolerations:
+          - effect: NoSchedule
+            operator: Equal
+            key: scheduling
+            value: vn
+          containers:
+          - name: register-commanddistributor
+            image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/register-command-distributor:latest
+            command: ["/bin/sh", "-c"]
+            args:
+            - >-
+              . /home/athena/athena.env &&
+              python /home/athena/register-command-distributor.py --appName=txnhub
+              --appPort=8090 --tenantId=${TENANT_ID} --host=commanddistributor
+              --serviceHost=tnxhubservice;python
+              /home/athena/register-command-distributor.py --appName=routing
+              --appPort=8081 --tenantId=${TENANT_ID} --host=commanddistributor
+              --serviceHost=routingservice;python
+              /home/athena/register-command-distributor.py --appName=reporting
+              --appPort=8084 --tenantId=${TENANT_ID} --host=commanddistributor
+              --serviceHost=reportservice;python
+              /home/athena/register-command-distributor.py --appName=rollover
+              --appPort=8100 --tenantId=${TENANT_ID} --host=commanddistributor
+              --serviceHost=plannedrolloverservice
+            volumeMounts:
+            - mountPath: /home/athena/athena.env
+              name: athenaenv
+              subPath: athena.env
+            imagePullPolicy: Always
+          volumes:
+            - name: athenaenv
+              configMap:
+                defaultMode: 420
+                name: release
+          restartPolicy: Never

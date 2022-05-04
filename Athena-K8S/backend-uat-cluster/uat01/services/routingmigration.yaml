@@ -1,0 +1,27 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  namespace: uat01
+  name: routingmigration
+spec:
+  schedule: "1 1 * 1 *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: routingmigration
+            image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/routingmigration:1.46.1
+            command: ["/bin/sh", "-c"]
+            args: 
+              - . /home/athena/athena.env;java -Ddb.server=${DB_HOST} -Ddb.name=Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+            volumeMounts:
+            - mountPath: /home/athena/athena.env
+              name: athenaenv
+              subPath: athena.env
+          volumes:
+            - name: athenaenv
+              configMap:
+                defaultMode: 420
+                name: release
+          restartPolicy: Never

@@ -1,0 +1,28 @@
+{
+    "name": "athena-vb-rds-trip-master-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false",
+        "value.converter.schemas.enable": "false",
+        "internal.key.converter": "org.apache.kafka.connect.storage.StringConverter",
+        "internal.value..converter": "org.apache.kafka.connect.json.JsonConverter",
+        "internal.key.converter.schemas.enable": "false",
+        "internal.value.converter.schemas.enable": "false",
+        "plugin.name": "wal2json_rds_streaming",
+        "database.server.name": "athena-virginia-beach-rds",
+        "database.hostname": "athena-virginia-beach-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com",
+        "database.port": "5432",
+        "database.user": "edulog",
+        "database.password": "edul0g",
+        "database.dbname": "Athena",
+        "table.whitelist": "(.*).trip_master",
+        "transforms": "Reroute",
+        "transforms.Reroute.type": "io.debezium.transforms.ByLogicalTableRouter",
+        "transforms.Reroute.topic.regex": "athena-virginia-beach-rds.(.*)",
+        "message.key.columns": "athena-virginia-beach-rds.rp_plan.trip_master:id",
+        "transforms.Reroute.topic.replacement": "vbtelematics-athena-trip-master-changes",
+        "snapshot.mode": "never"
+    }
+}

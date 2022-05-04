@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Karros Security Groups
+Parameters:
+  VPCStackName:
+    Description: The CloudFormation StackName of VPC
+    Type: String
+    Default: ""
+Resources:
+  ControllerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Administrator Controller Security Group
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref VPNInstanceSG
+        # Allow SSM Manage Instance
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp:
+            Fn::ImportValue: !Sub "${VPCStackName}-VPCCIDR"
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  VPNInstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VPN Security Group
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 1194
+          ToPort: 1194
+          CidrIp: 0.0.0.0/0
+
+  PrivateMavenRepoSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private Maven Repository Security Group
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        # Allow SSM Manage Instance
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp:
+            Fn::ImportValue: !Sub "${VPCStackName}-VPCCIDR"
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+Outputs:
+  ControllerSG:
+    Description: Ansible Security Group
+    Value: !Ref ControllerSG
+    Export:
+      Name: !Sub ${AWS::StackName}-ControllerSG
+  VPNInstanceSG:
+    Description: VPN Instance Security Group
+    Value: !Ref VPNInstanceSG
+    Export:
+      Name: !Sub ${AWS::StackName}-VPNInstanceSG
+  PrivateMavenRepoSG:
+    Description: Private Maven Repository Security Group
+    Value: !Ref PrivateMavenRepoSG
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateMavenRepoSG

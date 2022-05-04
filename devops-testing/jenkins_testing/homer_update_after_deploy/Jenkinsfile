@@ -1,0 +1,97 @@
+// Notify to channel
+node {
+  beReleasesList = sh (script: 'cat ${JENKINS_HOME}/athena/versions/release_backend.txt', returnStdout: true).trim()
+  feReleasesList = sh (script: 'cat ${JENKINS_HOME}/athena/versions/release_frontend.txt', returnStdout: true).trim()
+  sitesList = sh (script: 'cat ${JENKINS_HOME}/athena/sites/nonprod.sites.txt', returnStdout: true).trim()
+}
+
+pipeline {
+  agent any
+  
+  environment {
+    
+    JOB_DEPLOY = 'devops/homer/Homer-Updater'
+
+  }
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'siteName', choices: "${sitesList}", description: 'SiteName to take DB snapshot from.')
+    choice(name: 'region', choices: ['ohio', 'paris'], description: 'AWS Region that is hosting this Site.')
+    choice(name: 'feVersion', choices: "${feReleasesList}", description: 'Frontend Release Version tagged by QA/QC. E.g. 1.29.0')
+    choice(name: 'beVersion', choices: "${beReleasesList}", description: 'Backend Release Version to get AMI for Deployment Backend Services. E.g. 1.29.0')
+  }
+
+  stages {
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+    stage('Run Jenkins Job') {
+
+      environment {
+        envType = 'nonprod'
+        FE_DOMAIN = 'athena-nonprod.com'
+
+        GCHAT_TOKEN = "${GCHAT_TOKEN_ATH_RELEASE}"
+        SLACK_CHANNEL = "${SLACK_ATH_RELEASE}"
+      }
+      when {
+        expression { return params.refresh == false }
+      }
+      stages {
+        stage('Verify Authorization') {
+          steps {
+            script {
+              // Get Build User
+              wrap([$class: 'BuildUser']) {
+                env.executor = "${BUILD_USER_ID}"
+              }
+              if(executor == 'anonymous') {
+                error('You have to login to run this job!!!')
+              }
+            }
+          }
+        }
+        stage('Get new Version') {
+          steps {
+            dir('scripts/python') {
+              echo "Trigger to update homer"
+            }
+          }
+          post {
+            success {
+              echo "Deploy success for $siteName"
+              build job: "${JOB_UPDATE_HOMER}", parameters: [
+                string(name: 'ENV', value: "${envType}"),
+                string(name: 'TENANT', value: "${siteName}"),
+                string(name: 'FE_RELEASE_VERSION', value: "${feVersion}"),
+                string(name: 'BE_RELEASE_VERSION', value: "${beVersion}")]
+            }
+            failure {
+              echo "Deploy failure for $siteName"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      cleanWs()
+      
+    }
+    success {
+      echo 'Job run success'
+    }
+    failure {
+      echo 'Job run failed'
+    }
+  }
+}

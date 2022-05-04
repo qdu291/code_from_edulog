@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Chart.Name }}
+  labels:
+    name: {{ .Chart.Name }}
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        name: {{ .Chart.Name }}
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - >-
+            . /home/athena/athena.env;java
+            -Dmanagement.context-path=/
+            -Dmanagement.endpoints.web.base-path=/
+            -Dmanagement.endpoints.web.exposure.include="*"
+            -jar -XX:+UseG1GC -Xms256m -Xmx4096m /home/athena/app.jar
+            --kafka.bootstrap-servers=${ATHENA_KAFKA_CONSUMERS}
+            --kafka.consumer.group-id=${TENANT}-rideRegistrationRequest
+            --kafka.consumer.topics=${TENANT_ID}-athenaRideRegistrationChange-usw2demo
+            --mongo.url=mongodb://${CACHE_HOST}:27017/?uuidRepresentation=STANDARD
+            --application.athena.tenant.id=${TENANT_ID}
+            --application.athena.root=http://localhost:8090/api/v1
+            --application.karros.login.url=https://${KARROS_GATEWAY}/api/v1/signin
+            --application.karros.keycloak.client-id=${KEYCLOAK_BACKEND_ID}
+            --application.karros.keycloak.client-secret=${KEYCLOAK_SECRET}
+            --application.karros.keycloak.url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/token
+            --application.karros.keycloak.logout-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/logout
+            --application.karros.keycloak.forgot-password-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/karros-auth/forgot-password
+        ports:
+        - containerPort: {{.Values.service.port}}
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+          requests:
+            cpu: 200m
+            memory: "1024Mi"
+          limits:
+            cpu: 500m
+            memory: "4096Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{.Values.service.port}}
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 60
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

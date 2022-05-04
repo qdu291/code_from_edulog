@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: development-fr
+  name: commanddistributor
+  labels:
+    svc: commanddistributor
+spec:
+  selector:
+    app: commanddistributor
+  ports:
+  - protocol: TCP
+    port: 9091
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: development-fr
+  name: commanddistributor
+
+  labels:
+    name: commanddistributor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: commanddistributor
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: commanddistributor
+        app: commanddistributor
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/command-distributor:14b6a3e7c64319e6095c93dfeeeeb75818d5fcad
+        name: commanddistributor
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args:
+          - >-
+            . /home/athena/athena.env;java -Dmanagement.context-path=/ 
+            -Dmanagement.endpoints.web.base-path=/ 
+            -Dmanagement.endpoints.web.exposure.include=* 
+            -Dtenant.id=${TENANT_ID} 
+            -Dtenant.name=${TENANT} 
+            -Dserver.port=9091 
+            -Dspring.kafka.consumer.bootstrap-servers=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092 
+            -Dkafka.consume-from.tenant-change.topic=tenantSettings-p01usw2demo -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -Dspring.datasource.username=${DB_USER} 
+            -Dspring.datasource.password=${DB_PASS} -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+        ports:
+        - name: http
+          containerPort:  9091
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

@@ -1,0 +1,570 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy Athena Project Tenant Deployment Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Athena Deployment Configuration
+      Parameters:
+      - Tenant
+      - Env
+    - Label:
+        default: Network Configuration
+      Parameters:
+      - VPCStackName
+    - Label:
+        default: Amazon EC2 Configuration
+      Parameters:
+      - KeyPairName
+    - Label:
+        default: Amazon RDS (PostgreSQL) Configuration
+      Parameters:
+      - DBAllocatedStorage
+      - DBMaxAllocatedStorage
+      - DBInstanceClass
+      - DBIops
+      - DBMasterUserPassword
+      - DBMasterUsername
+      - DBMultiAZ
+      - DBSnapshotIdentifier
+      - DBParameterGroupName
+      - DBStorageType
+      - DBBackupRetentionPeriod
+    - Label:
+        default: Cache & Queue Configuration
+      Parameters:
+      - CQAMIID
+      - CQInstanceType
+      - CQASGMinSize
+      - CQASGMaxSize
+      - CQASGDesiredCapacity
+      - CacheUser
+      - CachePassword
+      - QueueUser
+      - QueuePassword
+      - CQPrivateIP
+      - CQInstanceId
+    - Label:
+        default: Athena Backend Configuration
+      Parameters:
+      - BackendAMIId
+      - BackendInstanceType
+      - BEASGMinSize
+      - BEASGMaxSize
+      - BEASGDesiredCapacity
+      - BESSLCertificateId
+      - BEDBUser
+      - BEDBPassword
+      - BEDomain
+      - BEHostedZoneId
+    - Label:
+        default: Athena Frontend Configuration
+      Parameters:
+      - FEDomain
+      - FEHostedZoneId
+      - FESSLCertificateId
+    ParameterLabels:
+      Tenant:
+        default: Tenant that we want to deploy Athena Project
+      Env:
+        default: 'Environment that we want to deploy Athena Project. Ex: prod | nonprod'
+      VPCStackName:
+        default: VPC Stack Athena deployed into
+      KeyPairName:
+        default: Default KeyPair for all instances in Athena
+      DBAllocatedStorage:
+        default: RDS PostgreSQL DB Storage Size
+      DBMaxAllocatedStorage:
+        default: RDS PostgreSQL DB Max Storage Size for AutoScaling Storage
+      DBInstanceClass:
+        default: RDS PostgreSQL DB Instance Type
+      DBIops:
+        default: RDS PostgreSQL DB Iops. Default is 1000
+      DBMasterUsername:
+        default: RDS PostgreSQL postgres user
+      DBMasterUserPassword:
+        default: RDS PostgreSQL postgres user password
+      DBMultiAZ:
+        default: RDS PostgreSQL DB enable HA
+      DBSnapshotIdentifier:
+        default: RDS PostgreSQL DB Snapshot to restore DB from
+      DBParameterGroupName:
+        default: RDS PostgreSQL DB Custom Parameter Group If we need
+      DBStorageType:
+        default: RDS PostgreSQL DB Storage Type.
+      DBBackupRetentionPeriod:
+        default: RDS PostgreSQL DB Retention Period
+      CQAMIID:
+        default: Cache-Queue Instance AMI Id
+      CQInstanceType:
+        default: Cache-Queue Instance Type
+      CQASGMinSize:
+        default: Cache-Queue AutoScaling Group Min Size
+      CQASGMaxSize:
+        default: Cache-Queue AutoScaling Group Max Size
+      CQASGDesiredCapacity:
+        default: Cache-Queue AutoScaling Group Desired Capacity
+      CacheUser:
+        default: Cache-Queue MongoDB User
+      CachePassword:
+        default: Cache-Queue MongoDB Password
+      QueueUser:
+        default: Cache-Queue RabbitMQ User
+      QueuePassword:
+        default: Cache-Queue RabbitMQ Password
+      CQPrivateIP:
+        default: Cache-Queue Instance Private IP Address
+      CQInstanceId:
+        default: Cache-Queue Instance Id. This is used for suitable with the current
+          deployment.
+      BackendAMIId:
+        default: Backend Instance AMI Id
+      BackendInstanceType:
+        default: Backend Instance Type
+      BEASGMinSize:
+        default: Backend AutoScaling Group Min Size
+      BEASGMaxSize:
+        default: Backend AutoScaling Group Max Size
+      BEASGDesiredCapacity:
+        default: Backend AutoScaling Group Desired Capacity
+      BESSLCertificateId:
+        default: Backend Certificate Manager SSL Cert ARN
+      BEDBUser:
+        default: Backend DB User to Access RDS PostgreSQL
+      BEDBPassword:
+        default: Backend DB User Password to Access RDS PostgreSQL
+      BEDomain:
+        default: Domain to deploy backend ALB
+      BEHostedZoneId:
+        default: Route53 Hosted Zone Id
+      FEDomain:
+        default: Domain to deploy frontend CloudFront
+      FEHostedZoneId:
+        default: Route53 Hosted Zone Id
+      FESSLCertificateId:
+        default: Frontend Certificate Manager SSL Cert ARN
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+    Default: hallettsville
+  Env:
+    Description: Environment that we want to deploy Athena Project
+    Type: String
+    Default: nonprod
+    AllowedValues:
+    - nonprod
+    - prod
+  VPCStackName:
+    Description: The VPC that Athena Project resources will run on
+    Type: String
+    Default: edulogvn-prod-vpc
+  KeyPairName:
+    Description: EC2 KeyPair Name
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: edulogvn-devops
+  DBAllocatedStorage:
+    Description: PostgreSQL RDS Allocated Storage
+    Type: Number
+    Default: 50
+  DBMaxAllocatedStorage:
+    Description: PostgreSQL RDS Max Allocated Storage for Storage Autoscaling
+    Type: Number
+    Default: 150
+  DBInstanceClass:
+    Description: The name of the compute and memory capacity class of the Amazon RDS
+      (PostgreSQL) DB instance.
+    Type: String
+    ConstraintDescription: Must select a valid database instance type.
+    Default: db.t3.small
+  DBIops:
+    Description: DB Iops. Used only when io1 specified for the StorageType property
+    Type: Number
+    AllowedValues:
+    - '1000'
+    - '2000'
+    - '3000'
+    - '4000'
+    - '5000'
+    - '6000'
+    - '7000'
+    - '8000'
+    - '9000'
+    - '10000'
+    ConstraintDescription: '1000 Iops min and increased in 1K increments. '
+    Default: '1000'
+  DBMasterUserPassword:
+    Description: The database admin account password
+    Type: String
+    AllowedPattern: (?=^.{6,255}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*
+    ConstraintDescription: Min 8 chars.
+    MaxLength: '64'
+    MinLength: '8'
+    NoEcho: 'True'
+    Default: Cl9a1iDRnDwI
+  DBMasterUsername:
+    Description: The database admin account username. Default is postgres for PostgreSQL
+    Type: String
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+    MaxLength: '16'
+    MinLength: '1'
+    NoEcho: 'true'
+    Default: postgres
+  DBMultiAZ:
+    Description: Specifies if the database instance is a multiple Availability Zone
+      deployment.
+    Type: String
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Default: 'false'
+  DBSnapshotIdentifier:
+    Description: The identifier for the DB snapshot to restore from (leave empty for
+      a new database)
+    Type: String
+    Default: athena-base-db-snap
+  DBParameterGroupName:
+    Description: The name of an existing DB parameter group
+    Type: String
+    Default: ''
+  DBStorageType:
+    Description: The storage type associated with this database instance (standard,
+      gp2, io1)
+    Type: String
+    AllowedValues:
+    - standard
+    - gp2
+    - io1
+    - ''
+    Default: gp2
+  DBBackupRetentionPeriod:
+    Description: The number of days for which automatic DB snapshots are retained
+    Type: String
+    Default: '7'
+  CQAMIID:
+    Description: Cache&Queue Base AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-044ad7a1038fee433
+  CQInstanceType:
+    Description: Cache&Queue Instance Type
+    Type: String
+    AllowedValues:
+    - t3.small
+    - t3.medium
+    - t3.large
+    - m5.large
+    - m5.xlarge
+    - m5.2xlarge
+    - c5.large
+    - c5.xlarge
+    - c5.2xlarge
+    - r5.large
+    - r5.xlarge
+    - r5.2xlarge
+    ConstraintDescription: Choose an instance type.
+    Default: t3.small
+  CQASGMinSize:
+    Description: Minimum No of Cache&Queue instances
+    Type: Number
+    Default: 1
+  CQASGMaxSize:
+    Description: Maximum No of Cache&Queue instances
+    Type: Number
+    Default: 1
+  CQASGDesiredCapacity:
+    Description: Desired No of Cache&Queue instances
+    Type: Number
+    Default: 1
+  CacheUser:
+    Description: MongoDB User for Backend
+    Type: String
+    Default: ''
+  CachePassword:
+    Description: MongoDB User Password for Backend
+    Type: String
+    Default: ''
+    NoEcho: 'True'
+  QueueUser:
+    Description: RabbitMQ User for Backend
+    Type: String
+    Default: edulog
+  QueuePassword:
+    Description: RabbitMQ User Password for Backend
+    Type: String
+    Default: edul0g
+    NoEcho: 'True'
+  BackendAMIId:
+    Description: Backend Base/Release AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-00bc27996f01cd955
+  BackendInstanceType:
+    Description: Backend Instance Type
+    Type: String
+    AllowedValues:
+    - t3.small
+    - t3.medium
+    - t3.large
+    - m5.large
+    - m5.xlarge
+    - m5.2xlarge
+    - c5.large
+    - c5.xlarge
+    - c5.2xlarge
+    - r5.large
+    - r5.xlarge
+    - r5.2xlarge
+    ConstraintDescription: Choose an instance type.
+    Default: m5.large
+  BEASGMinSize:
+    Description: Minimum No of Backend instances
+    Type: Number
+    Default: 1
+  BEASGMaxSize:
+    Description: Maximum No of Backend instances
+    Type: Number
+    Default: 3
+  BEASGDesiredCapacity:
+    Description: Desired No of Backend instances
+    Type: Number
+    Default: 1
+  BESSLCertificateId:
+    Description: The ARN of the SSL certificate to use for the Backend ALB
+    Type: String
+    Default: arn:aws:acm:us-east-2:690893158275:certificate/9978ae1d-16b0-4162-9add-3fb57083d06d
+  BEDBUser:
+    Description: PostgreSQL User that Backend uses to connect
+    Type: String
+    Default: edulog
+  BEDBPassword:
+    Description: PostgreSQL User Password that Backend uses to connect
+    Type: String
+    Default: edul0g
+    NoEcho: 'True'
+  BEDomain:
+    Description: Backend Root Domain which hosted in Route53
+    Type: String
+    Default: karrostech.net
+  BEHostedZoneId:
+    Description: Route53 Hosted Zone for Backend
+    Type: String
+    Default: Z33NWCVN5UFMNZ
+  CQPrivateIP:
+    Description: This is private IP Address of CQ Instance. Should be get from CacheQueueStack
+    Type: String
+    Default: 10.0.15.163
+  CQInstanceId:
+    Description: This is Instance Id of CQ Instance. Should be get from CacheQueueStack
+    Type: String
+    Default: i-12342223
+  FESSLCertificateId:
+    Description: The ARN of the SSL certificate to use for the Frontend CloudFront
+    Type: String
+    Default: arn:aws:acm:us-east-1:690893158275:certificate/a3d3e0cf-abd2-496d-a5b7-a7bf00881df6
+  FEDomain:
+    Description: Frontend Root Domain which hosted in Route53
+    Type: String
+    Default: karrostech.io
+  FEHostedZoneId:
+    Description: Route53 Hosted Zone for Frontend
+    Type: String
+    Default: ZPNED8AYA0B4K
+Resources:
+  SecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.us-east-2.amazonaws.com/edulogvn-devops/iac/cloudformation/athena/nonprod/vbtelematics/459c8de586b7d246828e2415d4773915.template
+      Parameters:
+        VPCID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-VPCID
+        VPCCIDR:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-VPCCIDR
+        ManagementSG:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-SSMSG
+  RDSStack:
+    Description: PostgreSQL RDS Stack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.us-east-2.amazonaws.com/edulogvn-devops/iac/cloudformation/athena/nonprod/vbtelematics/2b328cc54d6748bed5867ae2fa486f7d.template
+      Parameters:
+        DBAllocatedStorage:
+          Ref: DBAllocatedStorage
+        DBMaxAllocatedStorage:
+          Ref: DBMaxAllocatedStorage
+        DBBackupRetentionPeriod:
+          Ref: DBBackupRetentionPeriod
+        DBInstanceClass:
+          Ref: DBInstanceClass
+        DBIops:
+          Ref: DBIops
+        DBMasterUserPassword:
+          Ref: DBMasterUserPassword
+        DBMasterUsername:
+          Ref: DBMasterUsername
+        DBMultiAZ:
+          Ref: DBMultiAZ
+        DBInstanceIdentifier:
+          Fn::Sub: ${AWS::StackName}-rds
+        DBEngineVersion: 12.2
+        DBSnapshotIdentifier:
+          Ref: DBSnapshotIdentifier
+        DBParameterGroupName:
+          Ref: DBParameterGroupName
+        DBStorageType:
+          Ref: DBStorageType
+        DBSecurityGroup:
+          Fn::GetAtt:
+          - SecurityGroupStack
+          - Outputs.PostgreSQLSG
+        Subnet1ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PrivateSubnet2ID
+        Subnet2ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PrivateSubnet3ID
+        VPCID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-VPCID
+  CQASGStack:
+    Description: Cache & Queue Autoscaling Stack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.us-east-2.amazonaws.com/edulogvn-devops/iac/cloudformation/athena/nonprod/vbtelematics/664eaa1afdd7960ca3140a4ca1b85c90.template
+      Parameters:
+        Tenant:
+          Ref: Tenant
+        KeyPairName:
+          Ref: KeyPairName
+        CQAMIID:
+          Ref: CQAMIID
+        CQInstanceType:
+          Ref: CQInstanceType
+        CQASGMinSize:
+          Ref: CQASGMinSize
+        CQASGMaxSize:
+          Ref: CQASGMaxSize
+        CQASGDesiredCapacity:
+          Ref: CQASGDesiredCapacity
+        CQSecurityGroup:
+          Fn::GetAtt:
+          - SecurityGroupStack
+          - Outputs.CacheQueueSG
+        VPCID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-VPCID
+        ManagementSecurityGroup:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-SSMSG
+        Subnet1ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PrivateSubnet1ID
+        Subnet2ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PrivateSubnet2ID
+  BEASGStack:
+    Description: Backend AutoScaling Stack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.us-east-2.amazonaws.com/edulogvn-devops/iac/cloudformation/athena/nonprod/vbtelematics/4f8b7bc2810d86bfd359cd6117e7044d.template
+      Parameters:
+        Tenant:
+          Ref: Tenant
+        Env:
+          Ref: Env
+        KeyPairName:
+          Ref: KeyPairName
+        BackendAMIId:
+          Ref: BackendAMIId
+        BackendInstanceType:
+          Ref: BackendInstanceType
+        BEASGMinSize:
+          Ref: BEASGMinSize
+        BEASGMaxSize:
+          Ref: BEASGMaxSize
+        BEASGDesiredCapacity:
+          Ref: BEASGDesiredCapacity
+        BESSLCertificateId:
+          Ref: BESSLCertificateId
+        BEDBUser:
+          Ref: BEDBUser
+        BEDBPassword:
+          Ref: BEDBPassword
+        BEDomain:
+          Ref: BEDomain
+        BEHostedZoneId:
+          Ref: BEHostedZoneId
+        BESecurityGroup:
+          Fn::GetAtt:
+          - SecurityGroupStack
+          - Outputs.BackendSG
+        BEALBSecurityGroup:
+          Fn::GetAtt:
+          - SecurityGroupStack
+          - Outputs.BackendALBSG
+        ManagementSecurityGroup:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-SSMSG
+        Subnet1ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PrivateSubnet1ID
+        Subnet2ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PrivateSubnet2ID
+        PublicSubnet1ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PublicSubnet1ID
+        PublicSubnet2ID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-PublicSubnet2ID
+        VPCID:
+          Fn::ImportValue:
+            Fn::Sub: ${VPCStackName}-VPCID
+        CQPrivateIP:
+          Ref: CQPrivateIP
+        PublicALBTargetGroupWS:
+          Fn::GetAtt:
+          - CQASGStack
+          - Outputs.PublicALBTargetGroupWS
+        RDSEndpoint:
+          Fn::GetAtt:
+          - RDSStack
+          - Outputs.RDSEndPoint
+        CacheUser:
+          Ref: CacheUser
+        CachePassword:
+          Ref: CachePassword
+        QueueUser:
+          Ref: QueueUser
+        QueuePassword:
+          Ref: QueuePassword
+  FEStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.us-east-2.amazonaws.com/edulogvn-devops/iac/cloudformation/athena/nonprod/vbtelematics/de5e363a906e1bf40750a938b08cd7f5.template
+      Parameters:
+        Tenant:
+          Ref: Tenant
+        FEDomain:
+          Ref: FEDomain
+        FEHostedZoneId:
+          Ref: FEHostedZoneId
+        FESSLCertificateId:
+          Ref: FESSLCertificateId
+Outputs:
+  FrontendURL:
+    Description: The URL of the Athena Tenant website
+    Value:
+      Fn::GetAtt:
+      - FEStack
+      - Outputs.FEURL
+  BackendURL:
+    Description: The URL of the Backend Services
+    Value:
+      Fn::GetAtt:
+      - BEASGStack
+      - Outputs.BEURL

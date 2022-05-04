@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aggregateservice
+  labels:
+    svc: aggregateservice
+spec:
+  selector:
+    app: aggregateservice
+  ports:
+  - protocol: TCP
+    port: 8085
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregateservice
+  labels:
+    name: aggregateservice
+    scheduling: vn
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aggregateservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: aggregateservice
+        app: aggregateservice
+    spec:
+      nodeSelector: 
+        nodeType: scheduling-vn
+      tolerations:
+      - effect: NoSchedule
+        operator: Equal
+        key: scheduling
+        value: vn
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/aggregateservice:1.46.3
+        name: aggregateservice
+        command: ["/bin/sh", "-c"]
+        args:
+          - >-
+            . /home/athena/athena.env && java 
+            -Dserver.tomcat.mbeanregistry.enabled=true
+            -Dmanagement.context-path=/
+            -Dmanagement.endpoints.web.base-path=/
+            -Dmanagement.endpoints.web.exposure.include="*"
+            -Drouting.url=http://routingservice:8081/api
+            -Dtenant.id=${TENANT_ID}
+            -Dapp.name=aggregator_run
+            -Dtenant.name=${TENANT}
+            -Dspring.kafka.consumer.topics=stage-athena-run-changes,stage-athena-route-changes 
+            -Dspring.kafka.consumer.group-id=${TENANT_ID}-aggregator 
+            -Dspring.kafka.consumer.concurrency=12 
+            -Dspring.kafka.consumer.bootstrap-servers=${ATHENA_KAFKA_CONSUMERS}
+            -Dspring.kafka.producer.bootstrap-servers=${ATHENA_KAFKA_PRODUCERS}
+            -Dagg-service.es.url=${ES_URL}
+            -Dagg-service.es.username=${ES_USERNAME}
+            -Dagg-service.es.password=${ES_PASSWORD}
+            -Dagg-service.es.port=${ES_PORT}
+            -Dagg-service.es.run.index=${ES_RUN_INDEX}
+            -Dagg-service.es.trip.index=${ES_TRIP_INDEX}
+            -Dagg-service.es.snapshot.write.enabled=${ES_SNAPSHOT_ENABLED}
+            -Dagg-service.es.snapshot.sync.disabled=${ES_SNAPSHOT_ROUTING_WRITE_ENABLED}
+            -jar -XX:+UseG1GC -Xms256m -Xmx512m /home/athena/app.jar
+        ports:
+        - containerPort: 8085
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8085
+            scheme: HTTP
+          initialDelaySeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8085
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 60
+        lifecycle: # Needed for no-downtime deployments
+            preStop:
+              exec:
+                command: ["/bin/sleep", "5"]
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: aggregateservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aggregateservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

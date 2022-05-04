@@ -1,0 +1,130 @@
+// Job Name: ath-be-ivin-build-dev
+pipeline{
+  agent any
+
+  triggers {
+    pollSCM('H/5 * * * *') // poll SCM every 5 minutes
+  }
+
+  environment {
+    ENV = 'dev'
+    SERVICE_NAME = 'IVIN'
+    JOB_DEPLOY_DEV = 'ath-be-deploy-dev'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: '*/dev']],
+            userRemoteConfigs: [[
+              url: 'git@github.com:eduloginc/Athena-IVIN.git', 
+              credentialsId: 'eduloginc-git-tankhuu'
+              ]]
+          ])
+          // Set env GIT_COMMIT & SHORT_COMMIT & BUILD_VERSION
+          env.GIT_COMMIT = scmVars.GIT_COMMIT
+          env.SHORT_COMMIT = scmVars.GIT_COMMIT.substring(0,7)
+        }
+      }
+    }
+    stage('Versioning') {
+      steps {
+        echo "==> Get build_version"
+        script {
+          def pom_version = sh(script: 'mvn -q -Dexec.executable=\'echo\' -Dexec.args=\'${project.version}\' --non-recursive exec:exec', returnStdout: true).trim()
+          env.POM_VERSION = pom_version
+          env.BUILD_VERSION = pom_version.replaceAll(/-SNAPSHOT/, ".${BUILD_NUMBER}.${GIT_COMMIT}")
+        }
+      }
+    }
+    stage('Build') {
+      steps {
+        echo "==> Build Services with build_version: ${env.BUILD_VERSION}"
+        // echo "==> Analyze Code with SonarQube"
+        // withSonarQubeEnv('ATH_SONARQUBE') {
+        //   sh 'mvn clean install sonar:sonar -Dsonar.projectKey=geocode'
+        // }
+        // echo "==> Quality Gate with SonarQube"
+        // timeout(time: 1, unit: 'HOURS') {
+        //   waitForQualityGate abortPipeline: true
+        // }
+      }
+    }
+    stage('Publish Test Coverage Report') {
+         steps {
+           step([$class: 'JacocoPublisher', 
+                execPattern: '**/build/jacoco/*.exec',
+                classPattern: '**/build/classes',
+                sourcePattern: 'src/main/java',
+                exclusionPattern: 'src/test*'
+                ])
+            }
+    }
+    stage('Publish Jacoco HTML') {
+       steps {
+           publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'target/site/jacoco', reportFiles: 'index.html', reportName: 'Jacoco HTML Report', reportTitles: ''])
+       }
+    }
+    stage('Upload Artifacts') {
+      steps {
+        echo "==> Upload ${env.SERVICE_NAME} to Private-MavenRepo"
+        sh 'mvn deploy -DskipTests'
+        echo "==> Upload ${env.SERVICE_NAME} to S3"
+        sh 'aws s3 cp target/${SERVICE_NAME}.jar s3://${ATH_S3_ARTIFACTS_BUCKET}/athena/backend/${SERVICE_NAME}/${ENV}/${SERVICE_NAME}.jar'
+      }
+    }
+    stage('Deploy') {
+      steps {
+        echo "==> Deploy ${env.SERVICE_NAME} to Dev Environment."
+        build job: "${JOB_DEPLOY_DEV}", parameters: [
+          string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"),
+          string(name:'BUILD_VERSION', value: "${BUILD_VERSION}"),
+          string(name:'SHORT_COMMIT', value: "${SHORT_COMMIT}")]
+      }
+    }
+  }
+
+  post {
+    always {
+        cleanWs()
+    }
+    success {
+      echo "==> Send Git Status Check Success"
+      sh "send-git-status ${GIT_USERNAME} ${ATH_IVIN_REPO_NAME} ${GIT_COMMIT} ${GIT_STATUS_ACCESS_TOKEN} success ${JOB_BASE_NAME} ${BUILD_NUMBER}"
+    }
+    failure {
+      echo "==> Send Git Status Check Failure"
+      sh "send-git-status ${GIT_USERNAME} ${ATH_IVIN_REPO_NAME} ${GIT_COMMIT} ${GIT_STATUS_ACCESS_TOKEN} failure ${JOB_BASE_NAME} ${BUILD_NUMBER}"
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${BUILD_VERSION}\nService: ${SERVICE_NAME}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+      echo "==> Send Success Message to Slack"
+      script {
+        def blocks = [
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": ":rocket: *${JOB_NAME} #${BUILD_NUMBER}*"
+            ]
+          ],
+            [
+            "type": "divider"
+          ],
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": "Status: *${currentBuild.result}*\nBuild-Version: `${IMAGE_BUILD_VERSION}`\nImage-Id: `${IMAGE_ID}`\nService-Build: `${SERVICE_NAME}`\nGitHub-Commit: `${SHORT_COMMIT}`\nDuration: ${currentBuild.durationString}"
+            ]
+          ]
+        ]
+        slackSend(channel: "#${ATH_SLACK_NOTIFICATION_CHANNEL}", blocks: blocks)
+        // slackSend(channel: "#check-tool", blocks: blocks)
+      } 
+    }
+  }
+}

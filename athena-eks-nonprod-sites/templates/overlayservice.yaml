@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: overlayservice
+  labels:
+    svc: overlayservice
+spec:
+  selector:
+    app: overlayservice
+  ports:
+  - protocol: TCP
+    port: 8076
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: overlayservice
+  labels:
+    name: overlayservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: overlayservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: overlayservice
+        app: overlayservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/overlay:1.46.3
+        name: overlayservice
+        command: ["/bin/sh", "-c"]
+        args: 
+        - >
+          . /home/athena/athena.env && java
+          -Dspring.profiles.active=eks
+          -Dmanagement.context-path=/
+          -Dmanagement.endpoints.web.base-path=/
+          -Dmanagement.endpoints.web.exposure.include="*"
+          -jar -XX:+UseG1GC -Xms256m -Xmx1g /home/athena/app.jar
+          --overlay.database.server=${DB_HOST}
+          --geocode.database.server=${DB_HOST}
+        ports:
+        - containerPort: 8076
+        resources:
+          requests:
+            memory: 1024Mi
+            cpu: 250m
+          limits:
+            memory: 2048Mi
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: overlayservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: overlayservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

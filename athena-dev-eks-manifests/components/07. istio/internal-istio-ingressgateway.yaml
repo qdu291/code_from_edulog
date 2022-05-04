@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: istio-internal-ingressgateway
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '443'
+    alb.ingress.kubernetes.io/load-balancer-name: istio-internal-ingressgateway
+    alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:us-east-2:696952606624:certificate/61dd558a-44cf-42f6-a42a-bff894ae95ca'
+    # alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz/ready
+    alb.ingress.kubernetes.io/healthcheck-port: '31046' #Check the nodeport of status port in istio-ingressgateway pod
+    alb.ingress.kubernetes.io/target-type: instance
+    # alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    # alb.ingress.kubernetes.io/subnets: subnet-0443361955e29b821, subnet-0ce888cd48ce4a692
+    alb.ingress.kubernetes.io/tags: Environtment=dev, Name=gateway-ingress
+  labels:
+    app: istio-internal-ingressgateway
+spec:
+  rules:
+    - host: "*.eks-dev.athena-nonprod.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              serviceName: istio-internal-ingressgateway
+              servicePort: 443

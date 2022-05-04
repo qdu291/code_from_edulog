@@ -1,0 +1,3 @@
+useStatefulSet: true
+auth:
+  enabled: false

@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: uat01
+  name: importingservice
+  labels:
+    svc: importingservice
+spec:
+  selector:
+    app: importingservice
+  ports:
+  - protocol: TCP
+    port: 8097
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: uat01
+  name: importingservice
+
+  labels:
+    name: importingservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: importingservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: importingservice
+        app: importingservice
+    spec:
+      containers:
+      #- image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/importservice:41d0bc05b8eda5174151cdb1ead8d9af2bee3fdd
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/importservice:1.46.1
+        name: importingservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - . /home/athena/athena.env;java -Dserver.tomcat.mbeanregistry.enabled=true -Dspring.profiles.active=eks -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar --spring.data.mongodb.host=${CACHE_HOST}
+        ports:
+        - containerPort:  8097
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: importingservice
+  namespace: uat01
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: importingservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

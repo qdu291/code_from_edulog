@@ -1,0 +1,32 @@
+{
+  "name": "athena-vb-run-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "slot.name": "run",
+    "transforms": "Reroute",
+    "internal.key.converter.schemas.enable": "false",
+    "table.whitelist": "(.*).run",
+    "transforms.Reroute.topic.replacement": "athena-vb-run-changes",
+    "heartbeat.action.query": "INSERT INTO PUBLIC.DEBEZIUM_HEARTBEAT (CONNECTOR_NAME,LAST_HEARTBEAT_TS) VALUES ('athena-vb-run-connector',NOW()) ON CONFLICT (CONNECTOR_NAME) DO UPDATE SET LAST_HEARTBEAT_TS = NOW();",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "database.user": "edulog",
+    "database.dbname": "Athena",
+    "transforms.Reroute.type": "io.debezium.transforms.ByLogicalTableRouter",
+    "slot.drop.on.stop": "true",
+    "database.server.name": "athena-vb-rds",
+    "heartbeat.interval.ms": "300000",
+    "transforms.Reroute.topic.regex": "athena-vb-rds.(.*)",
+    "plugin.name": "wal2json_rds_streaming",
+    "database.port": "5432",
+    "key.converter.schemas.enable": "false",
+    "internal.key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "database.hostname": "athena-vb-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com",
+    "internal.value.converter.schemas.enable": "false",
+    "database.password": "edul0g",
+    "value.converter.schemas.enable": "false",
+    "name": "athena-vb-run-connector",
+    "internal.value..converter": "org.apache.kafka.connect.json.JsonConverter",
+    "snapshot.mode": "never"
+  }
+}

@@ -1,0 +1,89 @@
+pipeline {
+  agent any
+  options { 
+    disableConcurrentBuilds() 
+  }
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    string(name: 'release_version', description: "The release version for Athena ECR images. Notes: Tag shouldn't have space. Ex: 1.29.0 ")
+    string(name:'description', description: 'Description on the Release Version.')
+  }
+
+  stages {
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+
+      stages {
+        stage('Verify Authorization') {
+          steps {
+            script {
+              // Get Build User
+              wrap([$class: 'BuildUser']) {
+                env.CREATOR = "$BUILD_USER_ID"
+              }
+              echo "Creator: $CREATOR"
+              if(CREATOR == 'anonymous') {
+                error('You have to login to run this job!!!')
+              }
+            }
+          }
+        }
+
+        stage('Get BE_ASG_NAME') {
+          steps {
+            script {
+              // Get BE_ASG_NAME from AWS Parameter Store
+              env.BE_ASG_NAME = sh(script: "aws ssm get-parameter --name /edulog/athena/nonprod/release/be_asg --output text --query 'Parameter.[Value]'", returnStdout: true).trim()
+            }
+          }
+        }
+
+        stage('Collect Athena Services Version From Release Instance') {
+          environment {
+            ip_addresses = sh(script: '/usr/local/bin/getip_fromasg get_private_ip --name=${BE_ASG_NAME}', returnStdout: true).trim()
+            ssh_profile = "${JENKINS_HOME}/.ssh/devops.pem"
+            ssh_user = 'ubuntu'
+          }
+          steps {
+            echo "=> Collect Athena Services Version From Release Instance"
+            dir('athena/tag-release/collect-version') {
+              script {
+                env.script_file = 'collect-version.sh'
+                ip_addresses.tokenize(',[]').each { ip ->
+                  ip = ip.trim()
+                  echo "Script: ${script_file}"
+                  sh "scp -i ${ssh_profile} ./${script_file} ${ssh_user}@${ip}:/tmp"
+                  sh "ssh -i ${ssh_profile} ${ssh_user}@${ip} -t 'chmod +x /tmp/${script_file}; /tmp/${script_file} ${release_version}'"
+                  echo "Collected Athena Services Version From Release Instance"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      cleanWs()
+    }
+    success {
+      echo "Job run success"
+    }
+    failure {
+      echo "Job run failed"
+    }
+  }
+}

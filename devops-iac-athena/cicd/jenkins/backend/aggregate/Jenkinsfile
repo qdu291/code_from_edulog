@@ -1,0 +1,135 @@
+// Job Name: ath-be-aggregateservice-build-dev
+pipeline{
+  agent any
+
+  environment {
+    BRANCH_NAME = GIT_BRANCH.substring(GIT_BRANCH.lastIndexOf('/') + 1, GIT_BRANCH.length()).trim()
+    SHORT_COMMIT = GIT_COMMIT.substring(0,7)
+    SERVICE_NAME = 'AggregateService'
+    JOB_DEPLOY_DEV = 'athena/dev/ath-be-deploy-dev'
+    JOB_IMAGE_BUILD = 'athena/stage/ath-be-image-build'
+  }
+
+  stages {
+    stage('Versioning') {
+      when { anyOf { branch 'master'; branch 'dev' } }
+      steps {
+        echo "==> Get build_version"
+        script {
+          def pom_version = sh(script: 'mvn -q -Dexec.executable=\'echo\' -Dexec.args=\'${project.version}\' --non-recursive exec:exec', returnStdout: true).trim()
+          env.POM_VERSION = pom_version
+          env.BUILD_VERSION = pom_version.replaceAll(/-SNAPSHOT/, ".${BUILD_NUMBER}.${GIT_COMMIT}")
+        }
+      }
+    }
+    stage('Build for Features Branches') {
+      when { not { anyOf { branch 'master'; branch 'dev' } } }
+      steps {
+        echo "==> Build Service for branch: ${env.BRANCH_NAME}"
+        echo "==> Analyze Code with SonarQube"
+        withSonarQubeEnv('ATH_SONARQUBE') {
+          sh 'mvn clean test sonar:sonar -Dsonar.projectKey=athena-aggregateservice'
+        }
+        // echo "==> Quality Gate with SonarQube"
+        // timeout(time: 1, unit: 'HOURS') {
+        //   waitForQualityGate abortPipeline: true
+        // }
+      }
+    }
+    stage('Build') {
+      when { anyOf { branch 'master'; branch 'dev' } }
+      steps {
+        echo "==> Build Service with build_version: ${env.BUILD_VERSION}"
+        echo "==> Analyze Code with SonarQube"
+        withSonarQubeEnv('ATH_SONARQUBE') {
+          sh 'mvn clean install sonar:sonar -Dsonar.projectKey=athena-aggregateservice'
+          // skip deploy now because we didn't configure Private Maven Repository in pom.xml yet
+          // sh 'mvn clean deploy sonar:sonar -Dsonar.projectKey=athena-aggregateservice'
+        }
+        // echo "==> Quality Gate with SonarQube"
+        // timeout(time: 1, unit: 'HOURS') {
+        //   waitForQualityGate abortPipeline: true
+        // }
+      }
+    }
+    stage('Upload Artifacts for Dev') {
+      when { branch 'dev' }
+      environment { ENV = 'dev' }
+      steps {
+        echo "==> Upload to S3"
+        dir('target') {
+          sh 'aws s3 cp ${SERVICE_NAME}-${POM_VERSION}.jar s3://${ATH_S3_ARTIFACTS_BUCKET}/athena/backend/${SERVICE_NAME}/${ENV}/${SERVICE_NAME}.jar'
+        }
+      }
+    }
+    stage('Upload Artifacts for Stage') {
+      when { branch 'master' }
+      environment { ENV = 'stage' }
+      steps {
+        echo "==> Upload to S3"
+        dir('target') {
+          sh 'aws s3 cp ${SERVICE_NAME}-${POM_VERSION}.jar s3://${ATH_S3_ARTIFACTS_BUCKET}/athena/backend/${SERVICE_NAME}/${ENV}/${SERVICE_NAME}.jar'
+        }
+      }
+    }
+    stage('Deploy Dev') {
+      when { branch 'dev' }
+      environment { ENV = 'dev' }
+      steps {
+        echo "==> Deploy aggregateservice to Dev Environment."
+        build job: "${JOB_DEPLOY_DEV}", parameters: [
+          string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"),
+          string(name:'BUILD_VERSION', value: "${BUILD_VERSION}"),
+          string(name:'SHORT_COMMIT', value: "${SHORT_COMMIT}")]
+      }
+    }
+    stage('Deploy Stage') {
+      when {
+        branch 'master'
+      }
+      environment {
+        ENV = 'stage'
+      }
+      steps {
+        echo "==> Deploy ${env.SERVICE_NAME} to Stage Environment."
+        build job: "${JOB_IMAGE_BUILD}", parameters: [
+          string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"),
+          string(name:'BUILD_VERSION', value: "${BUILD_VERSION}")]
+      }
+    }
+  }
+  post {
+    success {
+      echo "==> Build Success"
+    }
+    failure {
+      echo "==> Build Failure"
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${BUILD_VERSION}\nService: ${SERVICE_NAME}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+      echo "==> Send Success Message to Slack"
+      script {
+        def blocks = [
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": ":rocket: *${JOB_NAME} #${BUILD_NUMBER}*"
+            ]
+          ],
+            [
+            "type": "divider"
+          ],
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": "Status: *${currentBuild.result}*\nBuild-Version: `${BUILD_VERSION}`\nService-Build: `${SERVICE_NAME}`\nGitHub-Commit: `${SHORT_COMMIT}`\nDuration: ${currentBuild.durationString}"
+            ]
+          ]
+        ]
+        slackSend(channel: "#${ATH_SLACK_NOTIFICATION_CHANNEL}", blocks: blocks)
+      }  
+    }
+  }
+}

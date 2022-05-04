@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Athena CloudWatch Alarms Template
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+  RDSDBIdentifier:
+    Description: RDS PostgreSQL DB Identifier
+    Type: String
+  AlarmTopic:
+    Description: SNS Topic for Alarm
+    Type: String
+Resources:
+  RDSFreeStorageSpace:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: !Sub ${Tenant}-RDSDiskUsage
+      AlarmDescription: "Alarm on RDS FreeStorageSpace"
+      ComparisonOperator: LessThanThreshold
+      DatapointsToAlarm: 1
+      Dimensions: 
+      - Name: DBInstanceIdentifier
+        Value: !Ref RDSDBIdentifier
+      EvaluationPeriods: 1
+      MetricName: FreeStorageSpace
+      Namespace: AWS/RDS
+      Period: 300
+      Statistic: Average
+      Threshold: 10240000000
+      OKActions: 
+      - !Ref AlarmTopic
+      InsufficientDataActions: 
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  RDSTransactionLogDiskUsage:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: !Sub ${Tenant}-RDSTransactionLogDiskUsage
+      AlarmDescription: "Alarm on RDS Transaction Log Disk Usage"
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: 1
+      Dimensions: 
+      - Name: DBInstanceIdentifier
+        Value: !Ref RDSDBIdentifier
+      EvaluationPeriods: 1
+      MetricName: TransactionLogsDiskUsage
+      Namespace: AWS/RDS
+      Period: 300
+      Statistic: Average
+      Threshold: 10240000000
+      OKActions: 
+      - !Ref AlarmTopic
+      InsufficientDataActions: 
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+
+# Outputs:

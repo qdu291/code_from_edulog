@@ -1,0 +1,102 @@
+pipeline{
+  agent any
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'Instance_Name', choices: ['Nifi_10.40.32.12', 'Nifi_10.40.41.71', 'Nifi_10.40.26.131', 'Nifi_10.40.32.36', 'Nifi_10.40.41.110'], description: 'Choose an NIFI instance')
+    choice(name: 'Instance_Action', choices: ['get_status', 'start', 'stop'], description: 'Choose the action')
+  }
+
+  // Define resources ID
+  environment {
+    NIFI_10_40_32_12 = "i-000e2367173ac28c3"
+    NIFI_10_40_41_71 = "i-0b94246d0be7f27c2"
+    NIFI_10_40_26_131 = "i-01b2e539bb57fbfdb"
+    NIFI_10_40_32_36 = "i-04d5a20faf0d051f5"
+    NIFI_10_40_41_110 = "i-0664848917eeb8774"
+  }
+
+  stages {
+
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Running') {
+          steps {
+            script {
+              // Assign Instance_Name to Variable
+              switch(Instance_Name) {
+                case 'Nifi_10.40.32.12':
+                  env.instance_ID = NIFI_10_40_32_12
+                  env.aws_region = "us-west-2"
+                break
+                case 'Nifi_10.40.41.71':
+                  env.instance_ID = NIFI_10_40_41_71
+                  env.aws_region = "us-west-2"
+                break
+                case 'Nifi_10.40.26.131':
+                  env.instance_ID = NIFI_10_40_26_131
+                  env.aws_region = "us-west-2"
+                break
+                case 'Nifi_10.40.32.36':
+                  env.instance_ID = NIFI_10_40_32_36
+                  env.aws_region = "us-west-2"
+                break
+                case 'Nifi_10.40.41.110':
+                  env.instance_ID = NIFI_10_40_41_110
+                  env.aws_region = "us-west-2"
+                break                
+              }
+
+              switch(Instance_Action) {
+                // Case == Start
+                case 'start':
+                  echo "==> Start the ${Instance_Name} instance"
+                  sh "aws ec2 stop-instances --instance-ids ${instance_ID} --region ${aws_region}"
+                break
+
+                // Case == Stop 
+                case 'stop':
+                  echo "==> Stop ${Instance_Name} BE instance"
+                  sh "aws ec2 stop-instances --instance-ids ${instance_ID} --region ${aws_region}"
+                break
+
+                // Case == Get_Status
+                case 'get_status':
+                  instance_status = sh(script: 'aws ec2 describe-instances --instance-ids ${instance_ID} --region ${aws_region} --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  echo "==> ${Instance_Name} BE instance is ${instance_status}"
+                break
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  post {
+    always {
+      echo "=> Clean Workspace after run"
+      cleanWs()
+    }
+    success {
+      echo "==> Build Success"
+    }
+    failure {
+      echo "==> Build Failure"
+    }
+  }
+}

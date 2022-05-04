@@ -1,0 +1,66 @@
+// On-Demand Deployment for Athena Backend Services
+pipeline {
+  agent any
+
+  parameters {
+    choice(name: 'GIT_REPO_NAME', choices: ['Athena', 'Athena-Gateway', 'Athena-GeocodeService', 'Athena-IVIN', 'Athena-EDTA', 'Athena-AggregateService', 'Athena-Overlay'], description: 'GitHub Repository Name of the service we will deploy')
+    string(name: 'GIT_TAG_RELEASE', description: 'The Git Tag/Release that we want to build and deploy.')
+    string(name: 'BE_INSTANCE_IP', description: 'The Athena Backend Instance that we want to deploy.')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        echo "=> Checkout"
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: "refs/tags/Release/${params.GIT_TAG_RELEASE}"]],
+            userRemoteConfigs: [[
+              url: "git@github.com:eduloginc/${GIT_REPO_NAME}.git", 
+              credentialsId: 'eduloginc-git-tankhuu'
+              ]]
+          ])
+        }
+      }
+    }
+    stage('Build') {
+      environment {
+        BUILD_VERSION = "${params.GIT_TAG_RELEASE}"
+      }
+      steps {
+        echo "==> Build jar files"
+        dir('Source/BuildAggregator') {
+          echo "==> Build Services with build_version: ${params.GIT_TAG_RELEASE}"
+          sh 'mvn clean install -DskipTests -e -U'
+        }
+        echo "==> Prepare for package jar files"
+        dir("${JENKINS_HOME}/.m2/repository/com/edulog") {
+          sh '''#!/bin/bash -xe
+              BUILD_DIR=/tmp/${BUILD_VERSION}
+              mkdir -p /tmp/${BUILD_VERSION}
+              cp -p RoutingServer/0.1.0/RoutingServer-0.1.0.jar $BUILD_DIR/RoutingServer.jar
+              cp -p ReportsServer/0.1.0/ReportsServer-0.1.0.jar $BUILD_DIR/ReportsServer.jar
+              cp -p TransactionHUBV2/2.1.0/TransactionHUBV2-2.1.0.jar $BUILD_DIR/TransactionHUBV2.jar
+              cp -p RoutingMigration/1.0/RoutingMigration-1.0.jar $BUILD_DIR/RoutingMigration.jar
+              cp -p PlannedRollover/2.1.0/PlannedRollover-2.1.0.jar $BUILD_DIR/PlannedRollover.jar
+              ls -l $BUILD_DIR
+            '''
+        }
+        echo "==> Package jar files"
+        sh """#!/bin/bash
+          cd /tmp
+          tar zcvf ${BUILD_VERSION}.tar.gz ${BUILD_VERSION}
+        """
+      }
+    }
+    stage('Upload Artifacts') {
+      steps {
+        echo "==> Upload Package jar files to S3"
+        sh '''#!/bin/bash -xe
+          aws s3 cp /tmp/${GIT_TAG_RELEASE}.tar.gz s3://${ATH_S3_ARTIFACTS_BUCKET}/athena/backend/${GIT_REPO_NAME}/
+        '''
+      }
+    }
+  }
+}

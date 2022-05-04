@@ -1,0 +1,121 @@
+node {
+    sitesList = sh (script: 'cat ${JENKINS_HOME}/athena/sites/nonprod.sites.txt', returnStdout: true).trim()
+}
+
+pipeline{
+  agent any
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'Tenant_Name', choices: "${sitesList}", description: 'Site to control')
+    choice(name: 'Tenant_Action', choices: ['get_status', 'start', 'stop'], description: 'Choose the action')
+  }
+
+  // define resources ID
+  environment {
+    ENV_TYPE = 'nonprod'
+    NONPROD_REGION = 'us-east-2'
+  }
+
+
+  stages {
+
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Running') {
+          steps {
+            script {
+
+              // 1. GET ASG NAME
+              echo "==> Get ${Tenant_Name}'s ASG name"
+              env.BE_ASG_NAME = sh(script: "aws ssm get-parameter --name /edulog/athena/${ENV_TYPE}/${Tenant_Name}/be_asg --region ${NONPROD_REGION} --output text --query 'Parameter.[Value]'", returnStdout: true).trim()
+              env.CQ_ASG_NAME = sh(script: "aws ssm get-parameter --name /edulog/athena/${ENV_TYPE}/${Tenant_Name}/cq_asg --region ${NONPROD_REGION} --output text --query 'Parameter.[Value]'", returnStdout: true).trim()
+
+              // 2. GET INSTANCE ID FROM ASG NAME
+              echo "==> Get ${Tenant_Name}'s Instances ID"
+              env.BE_ID = sh(script: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name ${BE_ASG_NAME} --query 'AutoScalingGroups[].Instances[].InstanceId' --region ${NONPROD_REGION} --output text", returnStdout: true).trim()
+              env.CQ_ID = sh(script: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name ${CQ_ASG_NAME} --query 'AutoScalingGroups[].Instances[].InstanceId' --region ${NONPROD_REGION} --output text", returnStdout: true).trim()
+              env.WOSNOS_ID = sh(script: "aws ssm get-parameter --name /edulog/athena/${ENV_TYPE}/${Tenant_Name}/wosnos_id --region ${NONPROD_REGION} --output text --query 'Parameter.[Value]'", returnStdout: true).trim()
+              // SHOULD BE HAVE IF / ELSE FOR WOSNOS INSTANCE EXIST CHECKING
+
+
+              switch(Tenant_Action) {
+                //4.1 Case == Start
+                case 'start':
+                  echo "==> Start ${Tenant_Name} BE instance"
+                  sh "aws ec2 start-instances --instance-ids ${BE_ID} --region ${NONPROD_REGION}"
+                  echo "==> Start ${Tenant_Name} CQ instance"
+                  sh "aws ec2 start-instances --instance-ids ${CQ_ID} --region ${NONPROD_REGION}"
+                  echo "==> Start ${Tenant_Name} WOSNOS instance"
+                  sh "aws ec2 start-instances --instance-ids ${WOSNOS_ID} --region ${NONPROD_REGION}"
+                  echo "==> Start ${Tenant_Name} RDS"
+                  sh "aws rds start-db-instance --db-instance-identifier athena-${Tenant_Name}-rds --region ${NONPROD_REGION}"
+                  sleep 300 // Seconds
+                  echo "==> Resume ASG processes"
+                  sh "aws autoscaling resume-processes --auto-scaling-group-name ${BE_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                  sh "aws autoscaling resume-processes --auto-scaling-group-name ${CQ_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                break
+
+                //4.2 Case == Stop
+                case 'stop':
+                  echo "==> suspend ASG processes"
+                  sh "aws autoscaling suspend-processes --auto-scaling-group-name ${BE_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                  sh "aws autoscaling suspend-processes --auto-scaling-group-name ${CQ_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                  sleep 30 // Seconds
+                  echo "==> Stop ${Tenant_Name} BE instance"
+                  sh "aws ec2 stop-instances --instance-ids ${BE_ID} --region ${NONPROD_REGION}"
+                  echo "==> Stop ${Tenant_Name} CQ instance"
+                  sh "aws ec2 stop-instances --instance-ids ${CQ_ID} --region ${NONPROD_REGION}"
+                  echo "==> Stop ${Tenant_Name} WOSNOS instance"
+                  sh "aws ec2 stop-instances --instance-ids ${WOSNOS_ID} --region ${NONPROD_REGION}"
+                  echo "==> Stop ${Tenant_Name} RDS"
+                  sh "aws rds stop-db-instance --db-instance-identifier athena-${Tenant_Name}-rds --region ${NONPROD_REGION}"
+                break
+
+                //4.3 Case == Get_Status
+                case 'get_status':
+                  echo "==> Get ${Tenant_Name}'s Instances status"
+                  BE_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${BE_ID} --region ${NONPROD_REGION} --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  CQ_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${CQ_ID} --region ${NONPROD_REGION} --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  WOSNOS_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${WOSNOS_ID} --region ${NONPROD_REGION} --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  RDS_STATUS = sh(script: 'aws rds describe-db-instances --db-instance-identifier athena-${Tenant_Name}-rds --region ${NONPROD_REGION} --query "DBInstances[].DBInstanceStatus" --output text', returnStdout: true).trim()
+                  echo "==> ${Tenant_Name} BE instance is ${BE_STATUS}"
+                  echo "==> ${Tenant_Name} CQ instance is ${CQ_STATUS}"
+                  echo "==> ${Tenant_Name} WOSNOS instance is ${WOSNOS_STATUS}"
+                  echo "==> ${Tenant_Name} RDS is ${RDS_STATUS}"
+                break
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  post {
+    always {
+      echo "=> Clean Workspace after run"
+      cleanWs()
+    }
+    success {
+      echo "==> Build Success"
+    }
+    failure {
+      echo "==> Build Failure"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: geocode
+  labels:
+    svc: geocode
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:696952606624:certificate/99a317f8-79c9-476c-b2cd-7882c1640778
+    # service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    dns.alpha.kubernetes.io/external: geocode.athena-nonprod.com
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 443
+    targetPort: 8095
+    protocol: TCP
+    name: https
+  selector:
+    app: geocode
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: geocode
+  labels:
+    name: geocode
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geocode
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: geocode
+        app: geocode
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/debeziumtenantservice:latest
+        name: geocode
+        command: ["/bin/sh", "-c"]
+        args: 
+          - |
+            sudo java \
+            -Dcom.sun.management.jmxremote.port=6001 \
+            -Dcom.sun.management.jmxremote=true \
+            -Dcom.sun.management.jmxremote.authenticate=false \
+            -Dcom.sun.management.jmxremote.ssl=false \
+            -Dcom.sun.management.jmxremote.rmi.port=6001 \
+            -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar \
+            --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena \
+            --athena.multi-tenant.enabled=true
+        ports:
+        - containerPort: 8095
+          name: geocode
+      restartPolicy: Always

@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: development-ktvn
+  name: routingservice
+  labels:
+    svc: routingservice
+spec:
+  selector:
+    app: routingservice
+  ports:
+  - protocol: TCP
+    port: 8081
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: development-ktvn
+  name: routingservice
+
+  labels:
+    name: routingservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: routingservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: routingservice
+        app: routingservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/routingservice:ce36c90b80400146fe55e24fd6ec80032e9c65dd
+        name: routingservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - . /home/athena/athena.env;java -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -Dspring.profiles.active=eks -Dspring.rabbitmq.host=${QUEUE_HOST} -Dspring.rabbitmq.username=${QUEUE_USER} -Dspring.rabbitmq.password=${QUEUE_PASS} -Dspring.data.mongodb.host=${CACHE_HOST} -Dathena.env.name=stage -Dathena.tenant.id=${TENANT_ID} -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar
+        ports:
+        - containerPort:  8081
+          name: routingservice
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: routingservice
+  namespace: development-ktvn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: routingservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tnxhubservice
+  labels:
+    svc: tnxhubservice
+spec:
+  selector:
+    app: tnxhubservice
+  ports:
+  - protocol: TCP
+    port: 8090
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tnxhubservice
+  labels:
+    name: tnxhubservice
+    scheduling: vn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tnxhubservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: tnxhubservice
+        app: tnxhubservice
+    spec:
+      nodeSelector:
+        nodeType: scheduling-vn
+      tolerations:
+      - effect: NoSchedule
+        operator: Equal
+        key: scheduling
+        value: vn
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/tnxhubservice:1.46.3
+        name: tnxhubservice
+        command: ["/bin/sh", "-c"]
+        args:
+        - >-
+          . /home/athena/athena.env && java
+          -Dspring.profiles.active=eks
+          -Dmanagement.context-path=/
+          -Dmanagement.endpoints.web.base-path=/
+          -Dmanagement.endpoints.web.exposure.include="*"
+          -Dtransactionhub.mongodb.host=${CACHE_HOST}
+          -Duser.mongodb.host=${CACHE_HOST}
+          -Dspring.rabbitmq.host=${QUEUE_HOST}
+          -Dspring.rabbitmq.username=${QUEUE_USER}
+          -Dspring.rabbitmq.password=${QUEUE_PASS}
+          -Dathena.env.name=${ENV}
+          -Dathena.tenant.id=${TENANT_ID}
+          -Dopt.host=${NOS_HOST}
+          -Dopt.port=${OPT_PORT}
+          -Dnos.port=${NOS_PORT}
+          -Dtransactionhub.es.url=${ES_URL}
+          -Dtransactionhub.es.username=${ES_USERNAME}
+          -Dtransactionhub.es.password=${ES_PASSWORD}
+          -Dtransactionhub.es.protocol=${ES_PROTOCOL}
+          -Dtransactionhub.es.connectionTimeout=${ES_CONNECTIONTIMEOUT}
+          -Dtransactionhub.es.socketTimeout=${ES_SOCKETTIMEOUT}
+          -Dtransactionhub.es.parallelESCountThreads=${ES_PARALELLESTHREADCOUNT}
+          -Dtransactionhub.es.port=${ES_PORT}
+          -Dtransactionhub.es.run.index=${ES_RUN_INDEX}
+          -Dtransactionhub.es.trip.index=${ES_TRIP_INDEX}
+          -Dtransactionhub.es.snapshot.read.enabled=${ES_SNAPSHOT_ENABLED}
+          -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+        ports:
+        - containerPort: 8090
+          name: tnxhubservice
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

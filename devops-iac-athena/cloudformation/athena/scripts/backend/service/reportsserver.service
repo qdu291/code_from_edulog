@@ -1,0 +1,14 @@
+[Unit]
+Description=Athena IVIN Services
+After=network.target
+
+[Service]
+ExecStartPre=/bin/sleep 5
+Type=simple
+EnvironmentFile=/opt/athena/env/athena.env
+ExecStart=/opt/athena/run/reportsserver.sh
+User=root
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

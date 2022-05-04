@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Athena Cloudwatch metrics template
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy to Athena Project
+    Type: String
+Resources:
+  DistributorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/distributor"
+      RetentionInDays: 7
+  RoutingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/routing"
+      RetentionInDays: 7
+  AthenaCommandDistributorFailureMetricFilter:
+    DependsOn: DistributorLogGroup
+    Type: AWS::Logs::MetricFilter
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/distributor"
+      FilterPattern: "[date, time, thread, loglevel, class, hyphen, metric=ATHENA_COMMAND_SOURCING_FAILURE, tenantName, msg]"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "Alerting/athena_command_sourcing_failure"
+          MetricName: "command_sourcing_failure"
+  AthenaCommandDistributorErrorMetricFilter:
+    DependsOn: DistributorLogGroup
+    Type: AWS::Logs::MetricFilter
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/distributor"
+      FilterPattern: "[date, time, thread, loglevel, class, hyphen, metric=ATHENA_COMMAND_SOURCING_ERROR, tenantName, msg]"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "Alerting/athena_command_sourcing_error"
+          MetricName: "command_sourcing_error"
+  PsqlExceptionMetricFilter:
+    DependsOn: DistributorLogGroup
+    Type: AWS::Logs::MetricFilter
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/distributor"
+      FilterPattern: "PSQLException"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "Alerting/PSQLException"
+          MetricName: "command_distributor_db_exception"
+  AthenaCommandDistributorFailedToStartMetricFilter:
+    DependsOn: DistributorLogGroup
+    Type: AWS::Logs::MetricFilter
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/distributor"
+      FilterPattern: "BeanCreationException"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "Alerting/failedToStartACD"
+          MetricName: "command_distributor_init_error"
+  AthenaRoutingElasticSearchSnapshotMetricFilter:
+    DependsOn: RoutingLogGroup
+    Type: AWS::Logs::MetricFilter
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/routing"
+      FilterPattern: "ALERT_ELASTIC_UPDATE"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "Alerting/failedToUpdateElasticSnapshot"
+          MetricName: "routing_elastic_search_snapshot_error"
+  AthenaRoutingElasticSearchSnapshotSupressedWarningMetricFilter:
+    DependsOn: RoutingLogGroup
+    Type: AWS::Logs::MetricFilter
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/edulog/athena/${Tenant}/routing"
+      FilterPattern: "ALERT_ELASTIC_UPDATE_SUPRESSED"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "Alerting/elasticUpdateSuppressed"
+          MetricName: "routing_elastic_search_snapshot_supressed_warning"

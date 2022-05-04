@@ -1,0 +1,21 @@
+#!/bin/bash -xe
+filename=$1
+fe_version=$2
+be_env=$3
+env=$4
+
+# Update BE URL
+if [ -n "$env" ] && [ $env = "prod" ]; then
+  jq ".apiHost = \"https://ath-be-${be_env}.karrostech.net/api/webquery\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+else
+  jq ".apiHost = \"https://ath-be-${be_env}.athena-nonprod.com/api/webquery\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+fi
+# Update FE version
+jq ".version = \"${fe_version}\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+# Update ga-tracking-id
+if [ -n "$be_env" ] && [ $be_env = "development-ktvn" ]; then
+  jq ".ga = \"G-CGFH9MN75P\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+elif [ -n "$be_env" ] && [ $be_env = "ktvn" ]; then
+  jq ".ga = \"G-7L9T5Q8TLC\"" /tmp/${filename}.${be_env}.json  | sponge /tmp/${filename}.${be_env}.json
+fi
+

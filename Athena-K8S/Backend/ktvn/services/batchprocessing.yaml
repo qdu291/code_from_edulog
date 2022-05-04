@@ -1,0 +1,65 @@
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  namespace: develop-eks
+#  name: batchprocessing
+#  labels:
+#    svc: batchprocessing
+#spec:
+#  selector:
+#    app: batchprocessing
+#  ports:
+#  - protocol: TCP
+#    port: 8075
+#    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ktvn
+  name: batchprocessing
+  labels:
+    name: batchprocessing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: batchprocessing
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: batchprocessing
+        app: batchprocessing
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/batchprocessing:d705e3f02ae51bc07000d8abd859278a7815848a
+        name: batchprocessing
+        command: ["/bin/sh", "-c"]
+        args:
+            - >
+              . /home/athena/athena.env && java -Dspring.profiles.active=eks
+              -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+              --batch.fileStorageDirectory=/home/athena
+              --batch.database.server=${DB_HOST}
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

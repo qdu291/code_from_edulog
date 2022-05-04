@@ -1,0 +1,110 @@
+
+// Notify to channel
+def notifyGChat(buildversion, releaseversion, channel, creator) {
+  def DURATION = currentBuild.durationString.split(' and ')[0]
+  hangoutsNotify message: "Status: ${currentBuild.result}\nType: Backend\nStage: Tag Release\nFromBuildVersion: ${buildversion}\nReleaseVersion: ${releaseversion}\nDuration: ${DURATION}\nCreator: ${creator}",
+    token: "${channel}", threadByJob: true
+}
+
+def notifySlack(buildversion, releaseversion, channel, creator) {
+  def DURATION = currentBuild.durationString.split(' and ')[0]
+  def blocks = [
+    [
+      "type": "section",
+      "text": [
+        "type": "mrkdwn",
+        "text": ":rocket: *Athena Backend*"
+      ]
+    ],
+      [
+      "type": "divider"
+    ],
+    [
+      "type": "section",
+      "text": [
+        "type": "mrkdwn",
+        "text": "Status: *${currentBuild.result}*\nType: Backend\nStage: Tag Release\nFromBuildVersion: ${buildversion}\n*ReleaseVersion: ${releaseversion}*\nDuration: ${DURATION}\nCreator: ${creator}"
+      ]
+    ]
+  ]
+  slackSend(channel: "#${channel}", blocks: blocks)
+}
+
+pipeline {
+  agent any
+  options { 
+    disableConcurrentBuilds() 
+  }
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    string(name: 'release_version', description: "The release version for Athena ECR images. Notes: Tag shouldn't have space. Ex: 1.29.0 ")
+    string(name:'description', description: 'Description on the Release Version.')
+  }
+
+  environment {
+    profile = 'prod'
+    prod_account_id = '690893158275'
+    region = 'us-east-2'
+    dest_region = 'eu-west-3'
+    version_file = '/var/lib/jenkins/athena/versions/release_backend.txt'
+
+    GCHAT_TOKEN_RELEASE = "${GCHAT_TOKEN_ATH_RELEASE}"
+    SLACK_CHANNEL_RELEASE = "${SLACK_ATH_RELEASE}"
+  }
+
+  stages {
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Verify Authorization') {
+          steps {
+            script {
+              // Get Build User
+              wrap([$class: 'BuildUser']) {
+                env.CREATOR = "$BUILD_USER_ID"
+              }
+              echo "Creator: $CREATOR"
+              if(CREATOR == 'anonymous') {
+                error('You have to login to run this job!!!')
+              }
+            }
+          }
+        }
+
+        // NEW CODE FROM HERE
+        stage('Tag Images') {
+          steps {
+            script {
+              echo "==> Tag Athena EKS images Release Version"
+              sh 'chmod +x ./scripts/bash/dockerize-all-services.sh'
+              sh './scripts/bash/dockerize-all-services.sh $release_version'
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      cleanWs()
+    }
+    success {
+      echo "Job run success"
+    }
+    failure {
+      echo "Job run failed"
+    }
+  }
+}

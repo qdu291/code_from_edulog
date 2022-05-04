@@ -1,0 +1,105 @@
+pipeline {
+  agent any
+
+  parameters {
+    choice(
+      name: 'SERVICE_NAME', 
+      choices: ['gateway', 'TransactionHUBV2', 'RoutingServer', 'GeoCodeService', 'RoutingMigration', 'DriverTimeAndAttendance', 'IVIN', 'PlannedRollover', 'AggregateService', 'Overlay', 'services'], 
+      description: 'The Service Build that trigger this job.')
+    string(name: 'BUILD_VERSION', defaultValue: '', description: 'Build Version of Service which is in format {POM_VERSION}.{BUILD_NUMBER}.{GIT_COMMIT}')
+    string(name: 'SHORT_COMMIT', defaultValue: '', description: 'Git Commit in shorten format of Service Build')
+  }
+
+  stages {
+    stage('Deploy services to Dev Environment') {
+      when {
+        equals expected: 'services', actual: params.SERVICE_NAME
+      }
+      steps {
+        sh '''#!/bin/bash -xe
+          ssh -t dev_instance "/usr/local/bin/deploy-services ${BUILD_VERSION}"
+        '''
+      }
+    }
+    stage ('Deploy service to Dev Environment') {
+      when {
+        not {
+          equals expected: 'services', actual: params.SERVICE_NAME
+        }
+      }
+      steps {
+        sh '''#!/bin/bash -xe
+          ssh -t dev_instance "/usr/local/bin/deploy-service ${SERVICE_NAME} ${BUILD_VERSION}"
+        '''
+        sh '''#!/bin/bash -xe
+          ssh -t dev_instance "/usr/local/bin/apply-service ${SERVICE_NAME}"
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${BUILD_VERSION}\nService: ${SERVICE_NAME}\nDuration: ${DURATION}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+      echo "==> Send Success Message to Slack"
+      script {
+        def blocks = [
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": ":rocket: *${JOB_NAME} #${BUILD_NUMBER}*"
+            ]
+          ],
+            [
+            "type": "divider"
+          ],
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": "Status: *${currentBuild.result}*\nBuild-Version: `${BUILD_VERSION}`\nService-Build: `${SERVICE_NAME}`\nGitHub-Commit: `${SHORT_COMMIT}`\nDuration: ${DURATION}"
+            ]
+          ]
+        ]
+        slackSend(channel: "#${ATH_SLACK_NOTIFICATION_CHANNEL}", blocks: blocks)
+      }
+    }
+    failure {
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${BUILD_VERSION}\nService: ${SERVICE_NAME}\nDuration: ${DURATION}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+      echo "==> Send Failure Message to Slack"
+      script {
+        def blocks = [
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": ":rocket: *${JOB_NAME} #${BUILD_NUMBER}*"
+            ]
+          ],
+            [
+            "type": "divider"
+          ],
+          [
+            "type": "section",
+            "text": [
+              "type": "mrkdwn",
+              "text": "Status: *${currentBuild.result}*\nBuild-Version: `${BUILD_VERSION}`\nService-Build: `${SERVICE_NAME}`\nGitHub-Commit: `${SHORT_COMMIT}`\nDuration: ${DURATION}"
+            ]
+          ]
+        ]
+        slackSend(channel: "#${ATH_SLACK_NOTIFICATION_CHANNEL}", blocks: blocks)
+      }  
+    }
+  }
+}

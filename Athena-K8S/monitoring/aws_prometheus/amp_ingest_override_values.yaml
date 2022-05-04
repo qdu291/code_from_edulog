@@ -1,0 +1,25 @@
+serviceAccounts:
+        server:
+            name: "amp-iamproxy-ingest-service-account"
+            annotations:
+                eks.amazonaws.com/role-arn: "arn:aws:iam::696952606624:role/amp-iamproxy-ingest-role"
+server:
+    sidecarContainers:
+        aws-sigv4-proxy-sidecar:
+           image: public.ecr.aws/aws-observability/aws-sigv4-proxy:1.0
+           args:
+           - --name
+           - aps
+           - --region
+           - us-east-2
+           - --host
+           - aps-workspaces.us-east-2.amazonaws.com
+           - --port
+           - :8005
+           ports:
+           - name: aws-sigv4-proxy
+             containerPort: 8005
+    statefulSet:
+        enabled: "true"
+    remoteWrite:
+        - url: http://localhost:8005/workspaces/ws-05458070-b231-4d32-adad-1dc5b5e46a0a/api/v1/remote_write

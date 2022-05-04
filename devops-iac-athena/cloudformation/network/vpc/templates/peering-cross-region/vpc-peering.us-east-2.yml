@@ -1,0 +1,164 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creates a Peering for VPC
+Parameters:
+  AthNonProdVPCStackName:
+    Type: String
+    Description: Athena Non Production VPC Stack
+  AthProdVPCStackName:
+    Type: String
+    Description: Athena Non Production VPC Stack
+  # Missoula Parameters
+  AthMissoulaPeerKtvnNonProdId:
+    Type: String
+    Description: Athena Missoula Peer KTVN Non Prod VPC ID
+    Default: "pcx-08dd67d7c49ce1571"
+  AthMissVPCCIDR:
+    Type: String
+    Description: Athena Missoula VPC CIDR
+    Default: "10.90.0.0/16"
+  # Missoula Parameters
+  AthMissoulaDevOpsPeerKtvnNonProdId:
+    Type: String
+    Description: Athena Missoula DevOps Peer KTVN Non Prod VPC ID
+    Default: "pcx-013c0d13f9476da14"
+  AthMissDevOpsVPCCIDR:
+    Type: String
+    Description: Athena Missoula DevOps VPC CIDR
+    Default: "172.16.0.0/16"
+  # Karros Stage RDS Parameters
+  KarrosStageRdsVPCID:
+    Type: String
+    Description: Karros Stage RDS VPCID
+    Default: "vpc-300b7e49"
+  KarrosStageRdsRegion:
+    Type: String
+    Description: Karros Stage RDS Region
+    Default: "us-west-2"
+  KarrosStageRdsVPCCIDR:
+    Type: String
+    Description: Karros Stage RDS VPC CIDR
+    Default: "10.40.32.0/21"
+  # Karros Demo RDS Parameters
+  KarrosDemoRdsVPCID:
+    Type: String
+    Description: Karros Demo RDS VPCID
+    Default: "vpc-2365185a"
+  KarrosDemoRdsRegion:
+    Type: String
+    Description: Karros Demo RDS Region
+    Default: "us-west-2"
+  KarrosDemoRdsVPCCIDR:
+    Type: String
+    Description: Karros Demo RDS VPC CIDR
+    Default: "10.40.40.0/21"
+Resources:
+  # NonProd -> Prod VPC Peering
+  AthNonProdPeerProd:
+    Type: "AWS::EC2::VPCPeeringConnection"
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ${AthNonProdVPCStackName}-VPCID
+      PeerVpcId:
+        Fn::ImportValue: !Sub ${AthProdVPCStackName}-VPCID
+      Tags:
+        - Key: Name
+          Value: AthNonProdPeerProd
+        - Key: project
+          Value: athena
+  AthNonProdPublicSubnetRoute:
+    Description: Add route for Athena Non Prod VPC Public Subnet
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthNonProdVPCStackName}-PublicSubnetRouteTable
+      DestinationCidrBlock:
+        Fn::ImportValue: !Sub ${AthProdVPCStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerProd
+  AthProdPrivateSubnet1Route:
+    Description: Add route for Athena Prod VPC Private Subnet 1
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthProdVPCStackName}-PrivateSubnet1RouteTable
+      DestinationCidrBlock:
+        Fn::ImportValue: !Sub ${AthNonProdVPCStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerProd
+  AthProdPrivateSubnet2Route:
+    Description: Add route for Athena Prod VPC Private Subnet 2
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthProdVPCStackName}-PrivateSubnet2RouteTable
+      DestinationCidrBlock:
+        Fn::ImportValue: !Sub ${AthNonProdVPCStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerProd
+  AthProdPrivateSubnet3Route:
+    Description: Add route for Athena Prod VPC Private Subnet 3
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthProdVPCStackName}-PrivateSubnet3RouteTable
+      DestinationCidrBlock:
+        Fn::ImportValue: !Sub ${AthNonProdVPCStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerProd
+  # Missoula Peering Route
+  AthMissoulaPublicSubnetRoute:
+    Description: Add route to Athena Missoula VPC Public Subnet
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthNonProdVPCStackName}-PrivateSubnet3RouteTable
+      DestinationCidrBlock: !Ref AthMissVPCCIDR
+      VpcPeeringConnectionId: !Ref AthMissoulaPeerKtvnNonProdId
+  # Missoula Peering Route
+  AthMissoulaDevOpsPublicSubnetRoute:
+    Description: Add route to Athena Missoula DevOps VPC Public Subnet
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthNonProdVPCStackName}-PrivateSubnet3RouteTable
+      DestinationCidrBlock: !Ref AthMissDevOpsVPCCIDR
+      VpcPeeringConnectionId: !Ref AthMissoulaDevOpsPeerKtvnNonProdId
+  # NonProd -> Karros RDS Stage VPC Peering
+  AthNonProdPeerKarrosStageRds:
+    Type: "AWS::EC2::VPCPeeringConnection"
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ${AthNonProdVPCStackName}-VPCID
+      PeerVpcId: !Ref KarrosStageRdsVPCID
+      PeerRegion: !Ref KarrosStageRdsRegion
+      Tags:
+        - Key: Name
+          Value: AthNonProdPeerKarrosStageRds
+        - Key: project
+          Value: athena
+  AthNonProdPublicSubnetRouteToKarrosStageRds:
+    Description: Route forward traffic to Karros Stage VPC Peering
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthNonProdVPCStackName}-PublicSubnetRouteTable
+      DestinationCidrBlock: !Ref KarrosStageRdsVPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerKarrosStageRds
+  # NonProd -> Karros RDS Demo VPC Peering
+  AthNonProdPeerKarrosDemoRds:
+    Type: "AWS::EC2::VPCPeeringConnection"
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ${AthNonProdVPCStackName}-VPCID
+      PeerVpcId: !Ref KarrosDemoRdsVPCID
+      PeerRegion: !Ref KarrosDemoRdsRegion
+      Tags:
+        - Key: Name
+          Value: AthNonProdPeerKarrosDemoRds
+        - Key: project
+          Value: athena
+  AthNonProdPublicSubnetRouteToKarrosDemoRds:
+    Description: Route forward traffic to Karros Demo VPC Peering
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AthNonProdVPCStackName}-PublicSubnetRouteTable
+      DestinationCidrBlock: !Ref KarrosDemoRdsVPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerKarrosDemoRds

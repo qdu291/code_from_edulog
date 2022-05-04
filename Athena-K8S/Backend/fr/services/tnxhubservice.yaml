@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: fr
+  name: tnxhubservice
+  labels:
+    svc: tnxhubservice
+spec:
+  selector:
+    app: tnxhubservice
+  ports:
+  - protocol: TCP
+    port: 8090
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: fr
+  name: tnxhubservice
+
+  labels:
+    name: tnxhubservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tnxhubservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: tnxhubservice
+        app: tnxhubservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/tnxhub-service:dockerize-0ef7b1f
+        name: tnxhubservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - . /home/athena/athena.env;java -Dtransactionhub.mongodb.host=${CACHE_HOST} -Duser.mongodb.host=${CACHE_HOST} -Dspring.rabbitmq.host=${QUEUE_HOST} -Dspring.rabbitmq.username=${QUEUE_USER} -Dspring.rabbitmq.password=${QUEUE_PASS} -Dspring.profiles.active=eks -Dathena.env.name=stage -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar
+        ports:
+        - containerPort:  8090
+          name: tnxhubservice
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

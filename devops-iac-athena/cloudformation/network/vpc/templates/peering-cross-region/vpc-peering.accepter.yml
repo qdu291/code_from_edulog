@@ -1,0 +1,58 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Accepter VPC Peering Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Accepter Peering Configuration
+        Parameters:
+          - AccVpcStackName
+          - VpcPeeringConnectionId
+      - Label:
+          default: Requester Peering Configuration
+        Parameters:
+          - ReqVPCCIDR
+    ParameterLabels:
+      VpcPeeringConnectionId:
+        default: "VPC Peering Connection Id Created in Requester"
+      AccVpcStackName:
+        default: "Accepter VPC Stack Name"
+      ReqVPCCIDR:
+        default: "Requester VPC CIDR"
+Parameters:
+  VpcPeeringConnectionId:
+    Type: String
+    Description: Vpc Peering Connection Id
+  AccVpcStackName:
+    Type: String
+    Description: Source VPC Stack Name
+  ReqVPCCIDR:
+    Type: String
+    Description: Requester VPC CIDR
+Resources:
+  peerPrivateSubnet1Route:
+    Description: Add route for Accepter VPC Private Subnet 1
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AccVpcStackName}-PrivateSubnet1RouteTable
+      DestinationCidrBlock: !Ref ReqVPCCIDR
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId
+  peerPrivateSubnet2Route:
+    Description: Add route for Accepter VPC Private Subnet 2
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AccVpcStackName}-PrivateSubnet2RouteTable
+      DestinationCidrBlock: !Ref ReqVPCCIDR
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId
+  peerPrivateSubnet3Route:
+    Description: Add route for Accepter VPC Private Subnet 3
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${AccVpcStackName}-PrivateSubnet3RouteTable
+      DestinationCidrBlock: !Ref ReqVPCCIDR
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId

@@ -1,0 +1,125 @@
+pipeline{
+  agent any
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'Tenant_Name', choices: ['athena-qa-fr-1', 'athena-qa-fr-2', 'athena-qa-fr-3', 'athena-qa-fr-4', 'athena-qa-fr-5'], description: 'Choose a Tenant to do')
+    choice(name: 'Tenant_Action', choices: ['get_status', 'start', 'stop'], description: 'Choose the action')
+  }
+
+  // define resources ID
+  environment {
+    ENV_TYPE = 'nonprod'
+    NONPROD_REGION = "us-east-2"
+
+    qa-fr-1_WOSNOS_ID = "i-00238081caa9341a9"
+    qa-fr-2_WOSNOS_ID = "i-0df07613a54a694a6"
+    qa-fr-3_WOSNOS_ID = "i-02fffc218004dd866"
+    qa-fr-4_WOSNOS_ID = "i-039c9f14bd44fb8f4"
+    qa-fr-5_WOSNOS_ID = "i-04ba1d051098e9ba6"
+
+  }
+
+
+  stages {
+
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Running') {
+          steps {
+            script {
+
+              // 1. GET ASG NAME
+              env.BE_ASG_NAME = sh(script: "aws ssm get-parameter --name /edulog/athena/${ENV_TYPE}/${Tenant_Name}/be_asg --region ${NONPROD_REGION} --output text --query 'Parameter.[Value]'", returnStdout: true).trim()
+              env.CQ_ASG_NAME = sh(script: "aws ssm get-parameter --name /edulog/athena/${ENV_TYPE}/${Tenant_Name}/cq_asg --region ${NONPROD_REGION} --output text --query 'Parameter.[Value]'", returnStdout: true).trim()
+              
+              // 2. GET INSTANCE ID FROM ASG NAME
+              env.BE_ID = sh(script: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name ${BE_ASG_NAME} --query 'AutoScalingGroups[].Instances[].InstanceId' --region ${NONPROD_REGION} --output text", returnStdout: true).trim()
+              env.CQ_ID = sh(script: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name ${CQ_ASG_NAME} --query 'AutoScalingGroups[].Instances[].InstanceId' --region ${NONPROD_REGION} --output text", returnStdout: true).trim()
+
+              //3.  Assign Tenant_Name to Variable
+              //switch(Tenant_Name) {
+              //  case 'athena-qa-fr-1':
+              //    env.RDS_ID = demoleg_RDS_ID
+              //  break
+              //  case 'stageleg':
+              //    env.RDS_ID = stageleg_RDS_ID
+              //  break
+              //}
+              
+              switch(Tenant_Action) {
+                //4.1 Case == Start
+                case 'start':
+
+                  echo "==> Start ${Tenant_Name} BE instance"
+                  sh "aws ec2 start-instances --instance-ids ${BE_ID} --region us-east-2"
+                  echo "==> Start ${Tenant_Name} CQ instance"
+                  sh "aws ec2 start-instances --instance-ids ${CQ_ID} --region us-east-2"
+                  echo "==> Start ${Tenant_Name} RDS"
+                  sh "aws rds start-db-instance --db-instance-identifier ${Tenant_Name}-rds --region us-east-2"
+                  sleep 300 // seconds
+                  echo "==> Resume ASG processes"
+                  sh "aws autoscaling resume-processes --auto-scaling-group-name ${BE_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                  sh "aws autoscaling resume-processes --auto-scaling-group-name ${CQ_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                                 
+                break
+
+                //4.2 Case == Stop
+                case 'stop':
+                  echo "==> suspend ASG processes"
+                  sh "aws autoscaling suspend-processes --auto-scaling-group-name ${BE_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                  sh "aws autoscaling suspend-processes --auto-scaling-group-name ${CQ_ASG_NAME} --scaling-processes 'ReplaceUnhealthy' 'Launch' 'AlarmNotification' 'HealthCheck' 'InstanceRefresh' 'AddToLoadBalancer' 'Terminate' 'ScheduledActions' 'AZRebalance'"
+                  sleep 30 // seconds
+                  echo "==> Stop ${Tenant_Name} BE instance"
+                  sh "aws ec2 stop-instances --instance-ids ${BE_ID} --region us-east-2"
+                  echo "==> Stop ${Tenant_Name} CQ instance"
+                  sh "aws ec2 stop-instances --instance-ids ${CQ_ID} --region us-east-2"
+                  echo "==> Stop ${Tenant_Name} RDS"
+                  sh "aws rds stop-db-instance --db-instance-identifier ${Tenant_Name}-rds --region us-east-2"
+                break
+
+                //4.3 Case == Get_Status
+                case 'get_status':
+                  BE_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${BE_ID} --region us-east-2 --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  CQ_STATUS = sh(script: 'aws ec2 describe-instances --instance-ids ${CQ_ID} --region us-east-2 --query "Reservations[].Instances[].State[].Name" --output text', returnStdout: true).trim()
+                  RDS_STATUS = sh(script: 'aws rds describe-db-instances --db-instance-identifier ${Tenant_Name}-rds --region us-east-2 --query "DBInstances[].DBInstanceStatus" --output text', returnStdout: true).trim()
+                  echo "==> ${Tenant_Name} BE instance is ${BE_STATUS}"
+                  echo "==> ${Tenant_Name} CQ instance is ${CQ_STATUS}"
+                  echo "==> ${Tenant_Name} RDS is ${RDS_STATUS}"
+                break
+
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  post {
+    always {
+      echo "=> Clean Workspace after run"
+      cleanWs()
+    }
+    success {
+      echo "==> Build Success"
+    }
+    failure {
+      echo "==> Build Failure"
+    }
+  }
+}

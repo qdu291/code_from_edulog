@@ -1,0 +1,94 @@
+// Job Name: ath-fe-cicd-stage
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'GIT_TAG_RELEASE', defaultValue: '', description: 'The Git Tag/Release that we want to build and deploy.')
+    string(name: 'RELEASE_VERSION', defaultValue: '', description: 'Release Version to add for Frontend')
+    string(name: 'TENANT', defaultValue: '', description: 'Environment or Tenant that we want to deploy Frontend')
+    string(name: 'CF_ID', defaultValue: '', description: 'CloudFront Distribution ID of Environment')
+  }
+
+  environment {
+    CONFIG_FILE = 'systemconfig'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: "refs/tags/${params.GIT_TAG_RELEASE}"]],
+            userRemoteConfigs: [[
+              url: 'git@github.com:eduloginc/EduLog-AthenaUI-v1_2.git', 
+              credentialsId: 'eduloginc-git-tankhuu'
+              ]]
+          ])
+          // Set env GIT_COMMIT & SHORT_COMMIT
+          env.GIT_COMMIT = scmVars.GIT_COMMIT
+          env.SHORT_COMMIT = scmVars.GIT_COMMIT.substring(0,7)
+        }
+      }
+    }
+    stage('Build') {
+      steps {
+        echo "==> Build Athena Frontend for ${env.TENANT}"
+        sh '/usr/local/bin/config_stomp'
+        sh 'pwd'
+        sh 'cat src/app/app.stompconfig.ts'
+        // sh 'npm install > /dev/null'
+        // sh 'npm run postinstall'
+        // // Make sure building angularjs jobs not run at the same time
+        // lock('ATH_FE_BUILDER') {
+        //   echo "==> Building..."
+        //   sh 'npm run build:prod'
+        // }
+      }
+    }
+    // stage('Configure') {
+    //   steps {
+    //     echo "==> Update config in assets/${env.CONFIG_FILE}.json"
+    //     dir('dist/assets') {
+    //       sh 'cp ${CONFIG_FILE}.json /tmp/${CONFIG_FILE}.${TENANT}.json'
+    //       sh "update-fe-config ${CONFIG_FILE} ${RELEASE_VERSION} ${TENANT}"
+    //       sh 'cp /tmp/${CONFIG_FILE}.${TENANT}.json ${CONFIG_FILE}.json'
+    //     }
+    //   }
+    // }
+    // stage('Deploy') {
+    //   steps {
+    //     dir('dist') {
+    //       echo "==> Deploy Athena Frontend for ${env.TENANT}"
+    //       echo "==> Remove files on s3://athena-${env.TENANT}.${env.ATH_FE_DOMAIN}"
+    //       sh '''#!/bin/bash -xe
+    //         aws s3 rm s3://athena-${TENANT}.${ATH_FE_DOMAIN} --recursive
+    //       '''
+    //       echo "==> Upload files to s3://athena-${env.TENANT}.${env.ATH_FE_DOMAIN}"
+    //       sh '''#!/bin/bash -xe
+    //         aws s3 cp --acl public-read --recursive . s3://athena-${TENANT}.${ATH_FE_DOMAIN}/
+    //       '''
+    //       echo "==> Invalidate Cloudfront ${env.CF_ID}"
+    //       sh '''#!/bin/bash -xe
+    //         aws cloudfront create-invalidation --distribution-id ${CF_ID} --paths \"/*\"
+    //       '''
+    //     }
+    //   }
+    // }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      // dir('dist') {
+      //   deleteDir()
+      // }
+    }
+    success {
+      echo "Deploy success for ${TENANT}"
+    }
+    failure {
+      echo "Deploy failed for ${TENANT}"
+    }
+  }
+}

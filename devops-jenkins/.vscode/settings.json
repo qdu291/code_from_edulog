@@ -1,0 +1,32 @@
+{
+  "python.analysis.extraPaths": ["scripts/python"],
+  "yaml.customTags": [
+    "!FindInMap sequence",
+    "!GetAtt",
+    "!GetAZs",
+    "!ImportValue",
+    "!Join sequence",
+    "!Ref",
+    "!Select sequence",
+    "!Split sequence",
+    "!Sub",
+    "!Not sequence",
+    "!Equals sequence",
+    "!Base64",
+    "!And",
+    "!And sequence",
+    "!If",
+    "!If sequence",
+    "!Not",
+    "!Equals",
+    "!Or",
+    "!Or sequence",
+    "!FindInMap",
+    "!Join",
+    "!Cidr",
+    "!Sub sequence",
+    "!ImportValue sequence",
+    "!Select",
+    "!Split"
+  ]
+}

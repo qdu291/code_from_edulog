@@ -1,0 +1,67 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: VPC Peering Template in same Account & Region
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Requester Peering Configuration
+        Parameters:
+          - ReqVpcStackName
+      - Label:
+          default: Accepter Peering Configuration
+        Parameters:
+          - AccVpcStackName
+    ParameterLabels:
+      ReqVpcStackName:
+        default: "Requester VPC Stack Name"
+      AccVpcStackName:
+        default: "Accepter VPC Stack Name"
+Parameters:
+  # Requester
+  ReqVpcStackName:
+    Type: String
+    Description: Source VPC Stack Name
+  # Accepter
+  AccVpcStackName:
+    Type: String
+    Description: Accepter VPC Stack Name
+Resources:
+  # VPC Peering
+  vpcPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ${ReqVpcStackName}-VPCID
+      PeerRegion: !Sub ${AWS::Region}
+      PeerVpcId: 
+        Fn::ImportValue: !Sub ${AccVpcStackName}-VPCID
+  peerReqRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Fn::ImportValue: !Sub ${ReqVpcStackName}-PublicSubnetRouteTable
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Sub ${AccVpcStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+  peerAccRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Fn::ImportValue: !Sub ${AccVpcStackName}-PrivateSubnet1ARouteTable
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Sub ${ReqVpcStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+  peerAccRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Fn::ImportValue: !Sub ${AccVpcStackName}-PrivateSubnet2ARouteTable
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Sub ${ReqVpcStackName}-VPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+Outputs:
+  VpcPeeringConnectionId:
+    Description: VPC Peering Connection Id
+    Value: !Ref vpcPeeringConnection

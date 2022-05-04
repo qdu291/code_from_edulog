@@ -1,0 +1,28 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+      ],
+    },
+    {
+      "name": "Python: getip_fromasg.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/getip_fromasg/getip_fromasg.py",
+      "args": [
+        "get_private_ip",
+        "--name=athena-chiefleschi-wa-hotfix-BEASGStack-NC58IXVP6WNR-AutoScaling-8B5SNS5DP60G",
+        "--profile=karros-athena",
+      ]
+    }
+  ]
+}

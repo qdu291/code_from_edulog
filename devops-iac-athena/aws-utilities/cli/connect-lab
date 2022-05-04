@@ -1,0 +1,9 @@
+#!/bin/bash -xe
+
+# VARIABLES
+USER=$1
+SSH_KEY=tankhuulab.pem
+IP=$2
+
+# MAIN
+/usr/bin/ssh -i /Users/tankhuu/.ssh/${SSH_KEY} ${USER}@${IP}

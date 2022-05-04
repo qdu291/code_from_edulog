@@ -1,0 +1,142 @@
+node {
+    sitesList_nonprod = sh (script: 'cat ${JENKINS_HOME}/athena/sites/nonprod.sites.txt', returnStdout: true).trim()
+    sitesList_prod = sh (script: 'cat ${JENKINS_HOME}/athena/sites/prod.sites.txt', returnStdout: true).trim()
+}
+
+pipeline {
+  agent any
+
+  parameters {
+    booleanParam(name: 'refresh', defaultValue: false, description: 'Read Jenkinsfile and exit.')
+    choice(name: 'envType', choices: ['nonprod', 'prod'], description: 'Environment Type for upload Snapshot Load tool. Default is NonProd.')
+    choice(name: 'siteName_nonprod', choices: "${sitesList_nonprod}", description: "Site need to be synced with ES. Please make sure EnvType selected as Nonprod")
+    choice(name: 'siteName_prod', choices: "${sitesList_prod}", description: "Site need to be synced with ES. Please make sure EnvType selected as Prod")
+  }
+
+  environment {
+    tenantId = ""
+    be_ip = ""
+    ENTITY_NAMES = 'run,rout,trip'
+    // SLOT_NAME = siteName.replace("-","_")
+  }
+
+  stages {
+    stage('Read Jenkinsfile') {
+      when {
+        expression { return params.refresh == true }
+      }
+      steps {
+        echo("Refreshed Jenkins Job")
+      }
+    }
+    stage('Run Jenkins Job') {
+      when {
+          expression { return params.refresh == false }
+      }
+      stages {
+        stage('Verify Authorization') {
+          steps {
+            script {
+              // Get Build User
+              wrap([$class: 'BuildUser']) {
+                env.CREATOR = "${BUILD_USER_ID}"
+              }
+              if(CREATOR == 'anonymous') {
+                error('You have to login to run this job!!!')
+              }
+            }
+          }
+        }
+        stage ('Get AWS_CMD based on env_type') {
+            steps {
+              script {
+                env.AWS_CMD = 'aws'
+                if(envType == 'prod') {
+                    env.AWS_CMD = 'aws --profile prod'
+                    siteName="${siteName_prod}"
+                    echo "${envType}"
+                } else {
+                    env.AWS_CMD = 'aws'
+                    siteName="${siteName_nonprod}"
+                }
+                }
+            }
+          }
+        stage('Get ES Endpoint') {
+          steps {
+            script {
+              env.ES_ENDPOINT = 'snapshot-sync-nonprod.karrostech.net:10401'
+              if(envType == 'prod') {
+                env.ES_ENDPOINT = 'snapshot-sync-prod.karrostech.net:10401'
+              } else {
+                env.ES_ENDPOINT = 'snapshot-sync-nonprod.karrostech.net:10401'
+              }
+            }
+          }
+        }
+        stage('Get Tenant ID and BE IP Address') {
+          steps {
+            script {
+              // Get Tenant ID
+              //tenantId = sh(script: "${AWS_CMD} cloudformation describe-stacks --stack-name athena-${siteName} --output yaml --query \"Stacks[0].Parameters[?ParameterKey==TenantId].ParameterValue\\\"", returnStdout: true).trim()
+              tenantID = sh(returnStdout: true, script: "${AWS_CMD} cloudformation describe-stacks --stack-name athena-${siteName} --query \"Stacks[0].Parameters[?ParameterKey==\'TenantId\'].ParameterValue\" --output text").trim()
+              echo "${tenantID}"
+              // Get BE IP Address
+              env.BE_ASG_NAME = sh(script: "${AWS_CMD} ssm get-parameter --name /edulog/athena/${envType}/${siteName}/be_asg --output text --query 'Parameter.[Value]'",returnStdout: true).trim()
+              if(envType == 'prod') {
+                be_ip_addresses = sh(script: '/usr/local/bin/getip_fromasg get_private_ip --profile ${envType} --name=${BE_ASG_NAME}', returnStdout: true).trim()
+              } else {
+                be_ip_addresses = sh(script: '/usr/local/bin/getip_fromasg get_private_ip --name=${BE_ASG_NAME}', returnStdout: true).trim()
+              }
+              be_ip_addresses.tokenize(',[]').each { ip ->
+                be_ip = ip.trim()
+              }
+              // be_ip = be_ip | sed -e 's/^"//' -e 's/"$//'
+              echo "${be_ip}"
+            }
+          }
+        }
+        stage('Upload BE endpoint to ES') {
+          steps {
+            sh "mkdir -p ${siteName}"
+
+            dir("${siteName}") {
+              script {
+                ENTITY_NAMES.tokenize(',').each { entityName ->
+                  def entity_file = "athena-${entityName}.json"
+                  // echo "=> Update for ${entity_config_file}"
+                  
+                  // Create json file for entity
+                  sh """
+                    #!/bin/bash
+                    cat << EOF > ${entity_file}
+                    {
+                      "ipAddr": "10.0.36.186",
+                      "tenantId": "${tenantID}",
+                      "entity": "${entityName}"
+                    }
+                  """
+                  echo "=> Upload entity ${entityName} to ES"
+                  sh "curl -s -X POST -H 'Content-Type: application/json' ${ES_ENDPOINT} --data @${entity_file}"
+                  sleep(10)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      echo "=> Cleanup"
+      cleanWs()
+    }
+    success {
+      echo "=> Job run success"
+    }
+    failure {
+      echo "=> Job run failed"
+    }
+  }
+}

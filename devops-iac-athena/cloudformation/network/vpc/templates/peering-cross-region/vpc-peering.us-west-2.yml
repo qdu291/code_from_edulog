@@ -1,0 +1,41 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creates a Peering for VPC
+Parameters:
+  # Athena NonProd VPC
+  AthNonProdPeerKarrosStageRdsPeeringId:
+    Type: String
+    Description: Athena NonProd VPC Peering with Karros Stage RDS ID
+    Default: "pcx-0528c4d85a344d504"
+  AthNonProdPeerKarrosDemoRdsPeeringId:
+    Type: String
+    Description: Athena NonProd VPC Peering with Karros Demo RDS ID
+    Default: "pcx-03d75c7b3b7bf6f29"
+  AthNonProdVPCCIDR:
+    Type: String
+    Description: Athena KTVN Non Prod VPC CIDR
+    Default: "10.10.0.0/16"
+  # Karros RDS VPC
+  KarrosStageRdsSubnetRouteTableID:
+    Type: String
+    Description: Karros Stage RDS Subnet RouteTable ID
+    Default: "rtb-292eb551"
+  KarrosDemoRdsSubnetRouteTableID:
+    Type: String
+    Description: Karros Demo RDS Subnet RouteTable ID
+    Default: "rtb-a3325edb"
+Resources:
+  KarrosStageRdsPrivateSubnetRoute:
+    Description: Karros Stage RDS forward traffic to Athena NonProd
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref KarrosStageRdsSubnetRouteTableID
+      DestinationCidrBlock: !Ref AthNonProdVPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerKarrosStageRdsPeeringId
+  KarrosDemoRdsPrivateSubnetRoute:
+    Description: Karros Demo RDS forward traffic to Athena NonProd
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref KarrosDemoRdsSubnetRouteTableID
+      DestinationCidrBlock: !Ref AthNonProdVPCCIDR
+      VpcPeeringConnectionId: !Ref AthNonProdPeerKarrosDemoRdsPeeringId

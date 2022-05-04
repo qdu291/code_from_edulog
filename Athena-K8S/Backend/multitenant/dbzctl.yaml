@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: dbzctl
+  labels:
+    svc: dbzctl
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:696952606624:certificate/99a317f8-79c9-476c-b2cd-7882c1640778
+    # service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    dns.alpha.kubernetes.io/external: dbzctl-eks.athena-nonprod.com
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 443
+    targetPort: 8080
+    protocol: TCP
+    name: https
+  selector:
+    app: dbzctl
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: dbzctl
+  labels:
+    name: dbzctl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dbzctl
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: dbzctl
+        app: dbzctl
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/debeziumtenantservice:latest
+        name: dbzctl
+        command: ["/bin/sh", "-c"]
+        args: 
+          - java -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/karros/app.jar
+        ports:
+        - containerPort: 8080
+          name: dbzctl
+      restartPolicy: Always

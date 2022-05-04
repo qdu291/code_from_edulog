@@ -1,0 +1,78 @@
+pipeline {
+  agent any
+
+  parameters {
+    choice(name: 'TENANT', choices: ['edulog'], description: 'Tenant to deploy.')
+    string(name: 'RELEASE_VERSION', defaultValue: '', description: 'Release Version tagged by QA/QC. Ex: RE-1.0.0')
+  }
+
+  environment {
+    ENV = 'prod'
+    CONFIG_FILE = 'systemconfig'
+  }
+
+  stages {
+    stage('Pull package') {
+      steps {
+        sh 'aws s3 cp s3://${ATH_S3_ARTIFACTS_BUCKET}/athena/frontend/release/${RELEASE_VERSION}.tar.gz .'
+        sh 'tar zxvf ${RELEASE_VERSION}.tar.gz'
+      }
+    }
+    stage('Configure') {
+      steps {
+        echo "==> Update config in assets/${env.CONFIG_FILE}.json"
+        dir('dist/assets') {
+          sh 'cp ${CONFIG_FILE}.json /tmp/${CONFIG_FILE}.${TENANT}.json'
+          sh "update-fe-config ${CONFIG_FILE} ${RELEASE_VERSION} ${TENANT}"
+          sh 'cp /tmp/${CONFIG_FILE}.${TENANT}.json ${CONFIG_FILE}.json'
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        dir('dist') {
+          echo "==> Deploy Athena Frontend for ${params.TENANT}"
+          echo "==> Remove files on s3://athena-${params.TENANT}.${env.ATH_PROD_FE_DOMAIN}"
+          sh '''#!/bin/bash -xe
+            aws s3 rm s3://athena-${TENANT}.${ATH_PROD_FE_DOMAIN} --recursive
+          '''
+          echo "==> Upload files to s3://athena-${params.TENANT}.${env.ATH_PROD_FE_DOMAIN}"
+          sh '''#!/bin/bash -xe
+            aws s3 cp --acl public-read --recursive . s3://athena-${TENANT}.${ATH_PROD_FE_DOMAIN}/
+          '''
+        }
+      }
+    }
+    stage('Invalidate CDN') {
+      when {
+        equals expected: 'edulog', actual: params.TENANT
+      }
+      steps {
+        echo "==> Invalidate Cloudfront ${env.ATH_EDULOG_CF_ID}"
+        sh '''#!/bin/bash -xe
+          aws cloudfront create-invalidation --distribution-id ${ATH_EDULOG_CF_ID} --paths \"/*\"
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      sh 'rm ${RELEASE_VERSION}.tar.gz'
+      dir('dist') {
+        deleteDir()
+      }
+    }
+    success {
+      echo "Deploy success for ${ENV}"
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nRelease-Version: ${params.RELEASE_VERSION}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      echo "Deploy failed for ${ENV}"
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nRelease-Version: ${params.RELEASE_VERSION}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

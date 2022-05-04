@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: uat01
+  name: command-distributor
+  labels:
+    svc: command-distributor
+spec:
+  selector:
+    app: command-distributor
+  ports:
+  - protocol: TCP
+    port: 9091
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: uat01
+  name: command-distributor
+
+  labels:
+    name: command-distributor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: command-distributor
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: command-distributor
+        app: command-distributor
+    spec:
+      containers:
+      # - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/command-distributor:df1e38279aa57ae60dc1641e16a37519539b9597
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/command-distributor:1.46.1
+        name: command-distributor
+        command: ["/bin/sh", "-c"]
+        args: 
+        #  - . /home/athena/athena.env;java -Dserver.tomcat.mbeanregistry.enabled=true -Dspring.profiles.active=eks -Dtenant.id=${TENANT_ID} -Dtenant.name=${TENANT} -Dspring.kafka.consumer.bootstrap-servers=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092 -Dkafka.consume-from.tenant-change.topic=tenantSettings-p01usw2demo --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+          - . /home/athena/athena.env;java -Dmanagement.context-path= -Dmanagement.endpoints.web.base-path= -Dmanagement.endpoints.web.exposure.include=* -Dtenant.id=${TENANT_ID} -Dtenant.name=${TENANT} -Dserver.port=9091 -Dspring.kafka.consumer.bootstrap-servers=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092 -Dkafka.consume-from.tenant-change.topic=tenantSettings-p01usw2demo -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -Dspring.datasource.username=${DB_USER} -Dspring.datasource.password=${DB_PASS} -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+        ports:
+        - containerPort:  9091
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: command-distributor
+  namespace: uat01
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: command-distributor
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

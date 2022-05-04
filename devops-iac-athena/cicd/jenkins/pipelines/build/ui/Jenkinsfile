@@ -1,0 +1,91 @@
+// JobName: ath-checkout-git-repo
+pipeline {
+  agent any
+
+  environment {
+    GIT_REPO = 'git@github.com:eduloginc/EduLog-AthenaUI-v1_2.git'
+    GIT_CREDS = 'eduloginc-git-tankhuu'
+    ARTIFACT_PATH = 's3://edulog-athena-artifacts/build/ui'
+    LOCKER = 'ATH_FE_BUILDER'
+  }
+
+  parameters {
+    choice(name: 'type', choices: ['branch', 'tag'], description: 'Git Type of checkout. Ex. branch/tag')
+    string(name: 'specifier', defaultValue: 'dev', description: 'Git Branch/Tag specifier to checkout code.')
+  }
+
+  stages{
+    stage("Get Branch Specifier") {
+      when { equals expected: 'branch', actual: params.type }
+      steps {
+        script {
+          env.GIT_SPEC = "refs/heads"
+        }
+      }
+    }
+    stage("Get Tag Specifier") {
+      when { equals expected: 'tag', actual: params.type }
+      steps {
+        script { 
+          env.GIT_SPEC = "refs/tags"
+        }
+      }
+    }
+    stage("Checkout") {
+      steps {
+        echo "=> Checkout from specifier: ${env.GIT_SPEC}/${params.specifier}"
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: "${env.GIT_SPEC}/${params.specifier}"]],
+            userRemoteConfigs: [[
+              url: "${GIT_REPO}", 
+              credentialsId: "${GIT_CREDS}"
+              ]]
+          ])
+          // Set env GIT_COMMIT & SHORT_COMMIT & BUILD_VERSION
+          env.GIT_COMMIT = scmVars.GIT_COMMIT
+          env.SHORT_COMMIT = scmVars.GIT_COMMIT.substring(0,7)
+        }
+      }
+    }
+    stage("Build") {
+      steps {
+        sh 'npm install > /dev/null'
+        sh 'npm run postinstall'
+        // Make sure building angularjs jobs not run at the same time
+        lock("${LOCKER}") {
+          echo "==> Building..."
+          sh 'npm run build:prod'
+        }
+      }
+    }
+    stage("Artifacts") {
+      steps {
+        echo "==> Create Artifact"
+        script {
+          package_name = "${params.specifier}"
+          if (params.type == 'branch') {
+            package_name = "${params.specifier}-${SHORT_COMMIT}"
+          }
+          env.ARTIFACT_FOLDER = package_name.replaceAll('/', "-")
+        }
+        sh 'tar zcvf package.tar.gz dist/'
+        echo "==> Upload package Artifact to S3 ${ARTIFACT_FOLDER}"
+        sh "aws s3 cp package.tar.gz ${ARTIFACT_PATH}/${ARTIFACT_FOLDER}/"
+      }
+    }
+  }
+  post{
+    always {
+      echo "========always========"
+    }
+    success {
+      echo "========pipeline executed successfully ========"
+      cleanWs()
+    }
+    failure {
+      echo "========pipeline execution failed========"
+    }
+  }
+}

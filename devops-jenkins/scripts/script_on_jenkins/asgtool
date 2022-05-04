@@ -1,0 +1,102 @@
+# Args: 
+#   env = prod | non-prod (default = non-prod)
+#   region = us-east-2 | us-west-3 (default = us-east-2)
+#   tenant = <tenant_name>
+
+#!/usr/bin/env python3
+import os
+import sys
+import boto3 
+
+def get_client(client_object, env, region):
+    try:
+        if env == "prod":
+            client = boto3.client(
+                client_object,
+                aws_access_key_id="AKIA2BXDQ66B5LEFDA6D",
+                aws_secret_access_key="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",
+                region_name = region
+            )
+        else:
+            client = boto3.client(
+                client_object,
+                aws_access_key_id="AKIA2ERM4Z6QIQCTYIMI",
+                aws_secret_access_key="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",
+                region_name = region
+            )
+        return client
+    except Exception as e:
+        print("get_client.error", e)
+        raise e
+
+def get_asg_name(env, region, tenant):
+    try:
+        client_object = 'cloudformation'
+        stack_name = 'athena-' + tenant   # Eg: tenant = 'development-fr' -> stack_name = 'athena-development-fr'
+        client = get_client(client_object, env, region)
+        be_stack_name = client.describe_stack_resources(StackName=stack_name,LogicalResourceId='BEASGStack')['StackResources'][0]['PhysicalResourceId'].split("/")[1]
+        asg_name = client.describe_stack_resources(StackName=be_stack_name,LogicalResourceId='AutoScaling')['StackResources'][0]['PhysicalResourceId']
+        return asg_name
+    except Exception as e:
+        print("get_asg_name.error", e)
+        raise e
+
+def suspend_process(asg_name):
+    try:
+        client_object = 'autoscaling'
+        client = get_client(client_object, env, region)
+        client.suspend_processes(
+            AutoScalingGroupName=asg_name,
+            ScalingProcesses=[
+                'Launch',
+                'Terminate',
+                'AddToLoadBalancer',
+                'AZRebalance',
+                'InstanceRefresh',
+                'ReplaceUnhealthy',
+                'ScheduledActions'
+            ]
+        )
+    except Exception as e:
+        print("suspend_process.error", e)
+        raise e
+
+def resume_process(asg_name):
+    try:
+        client_object = 'autoscaling'
+        client = get_client(client_object, env, region)
+        client.resume_processes(
+            AutoScalingGroupName=asg_name,
+            ScalingProcesses=[
+                'Launch',
+                'Terminate',
+                'AddToLoadBalancer',
+                'AZRebalance',
+                'InstanceRefresh',
+                'ReplaceUnhealthy',
+                'ScheduledActions'
+            ]
+        )
+    except Exception as e:
+        print("suspend_process.error", e)
+        raise e
+
+if __name__ == "__main__":
+    # format: asgtool env region tenant action
+    try:
+        env = sys.argv[1]
+        region = sys.argv[2]
+        tenant = sys.argv[3]
+        action = sys.argv[4]
+        asg_name = get_asg_name(env, region, tenant)
+        client_object = 'cloudformation'
+        client = get_client(client_object, env, region)
+        if action == "suspend":
+            suspend_process(asg_name)
+        elif action == "resume":
+            resume_process(asg_name)
+        else:
+            print("the action is not supported!")
+    except Exception as e:
+        print("__main__.error", e)
+        raise e

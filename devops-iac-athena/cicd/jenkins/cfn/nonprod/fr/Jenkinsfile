@@ -1,0 +1,296 @@
+// Job: athena-deploy-nonprod-env
+node {
+    beReleasesList = sh (script: 'cat ${JENKINS_HOME}/athena/versions/release_backend.txt', returnStdout: true).trim()
+    feReleasesList = sh (script: 'cat ${JENKINS_HOME}/athena/versions/release_frontend.txt', returnStdout: true).trim()
+    timezoneList = sh (script: 'cat ${JENKINS_HOME}/athena/config/timezone-list.txt', returnStdout: true).trim()
+}
+pipeline {
+  agent any
+
+  parameters {
+    choice(name: 'REGION', choices: ['eu-west-3'])
+    string(name: 'TENANT', description: 'Tenant should not be duplicated with the existing tenants!!! Tenant must contain only alphabet and hyphen!!!')
+    choice(name: 'IS_NEW_TENANT', choices: ['Yes', 'No'], description: 'If Yes, Create new Tenant in Karros Mission Control')
+    string(name: 'TENANT_ID', defaultValue: '', description: 'Tenant ID to create environment. It is required when IS_NEW_TENANT is No!')
+    choice(name: 'TIMEZONE', choices: "${timezoneList}", description: 'Choose a Timezone for new Tenant. It is only valid when IS_NEW_TENANT is Yes!')
+    string(name: 'EMAIL', description: 'Admin User Email for managing Tenant.')
+    string(name: 'FIRST_NAME', description: 'Admin User First Name. It is only valid when IS_NEW_TENANT is Yes!')
+    string(name: 'LAST_NAME', description: 'Admin User Last Name. It is only valid when IS_NEW_TENANT is Yes!')
+    choice(name: 'FE_RELEASE_VERSION', choices: "${feReleasesList}", description: 'Release Version of Backend to get AMI for Deployment Backend Servicess. Ex: BE-x.x.x')
+    choice(name: 'BE_RELEASE_VERSION', choices: "${beReleasesList}", description: 'Release Version of Backend to get AMI for Deployment Backend Servicess. Ex: BE-x.x.x')
+    choice(name: 'BE_INSTANCE_TYPE', choices: ['m5.large', 'm5.xlarge', 'm5.2xlarge'])
+    choice(name: 'CQ_INSTANCE_TYPE', choices: ['t3.small', 't3.large', 't3.xlarge'])
+    choice(name: 'DB_INSTANCE_TYPE', choices: ['db.t3.small', 'db.t3.medium', 'db.t3.large', 'db.m5.large', 'db.m5.xlarge'])
+    choice(name: 'DB_ALLOCATE_STORAGE', choices: ['50', '100', '150', '200', '250'], description: 'DB Allocate Storage')
+    choice(name: 'DB_MAXALLOCATE_STORAGE', choices: ['100', '150', '200', '250', '300'], description: 'Maximum DB Allocate Storage, this value must be greater than DB_ALLOCATE_STORAGE')
+    string(name: 'DB_SNAPSHOT_ID', defaultValue: '', description: 'RDS Snapshot ID to deploy base database into RDS')
+    password(name: 'DB_MASTER_PASSWORD', defaultValue: 'rU18iWV4qxKU', description: 'Password for user postgres of RDS')
+  }
+
+  environment {
+    PROJECT = 'athena'
+    ENV = 'nonprod'
+    AUTHOR = 'devops'
+    STACK_NAME = "${PROJECT}-${params.TENANT}"
+    VPC_STACK_NAME = 'athena-nonprod-vpc-fr'
+    KEYPAIR = 'athena-devops'
+    DOMAIN = 'athena-nonprod.com'
+    HOSTEDZONE_ID = 'Z0554033189HKTXE7UEFR'
+    SSL_CERTIFICATE_ARN = 'arn:aws:acm:us-east-1:696952606624:certificate/6ce0fe36-9363-4eee-b3ab-253895739d4b'
+    BE_DOMAIN = 'athena-nonprod.com'
+    BE_HOSTEDZONE_ID = 'Z0554033189HKTXE7UEFR'
+    BE_SSL_CERTIFICATE_ARN = 'arn:aws:acm:eu-west-3:696952606624:certificate/be65bfd8-a07f-46bd-b30f-85f0483d68e7'
+    CQ_AMI_ID = 'ami-00701f89735779450'
+    // DEVOPS BUCKET 
+    S3_DEVOPS = 'edulog-athena-devops2'
+    // ARTIFACTS BUCKET
+    S3_ARTIFACTS = 'edulog-athena-artifacts'
+    S3_ARTIFACTS_PREFIX = 'athena/frontend/release'
+    FE_CONFIG_FILE = 'systemconfig'
+    // TEMPLATE DIRECTORY
+    MASTER_TEMPLATE = "cloudformation/athena/templates/athena.yml"
+    OUTPUT_MASTER_TEMPLATE = "athena.${params.TENANT}.yaml"
+    BE_AMI_ID="ami-0baf82cc93d13821c"
+  }
+
+
+  stages {
+    stage('Verify tenant_id and user email') {
+      steps {
+        script {
+          if(IS_NEW_TENANT == 'Yes') {
+            if(FIRST_NAME == '') error('Missing FIRST_NAME parameter!')
+            if(LAST_NAME == '') error('Missing LAST_NAME parameter!')
+          } else {
+            if(TENANT_ID == '') {
+              error('Missing TENANT_ID parameter!')
+            }
+          }
+          if(EMAIL == '') {
+            error('Missing EMAIL parameter!')
+          }
+        }
+      }
+    }
+
+    stage('Create New Tenant & User in MissionControl') {
+      when { equals expected: 'Yes', actual: params.IS_NEW_TENANT }
+      steps {
+        echo "=> Call Job to create new Tenant & User"
+        build job: '../karros-cloud/create-new-tenant', parameters: [
+          string(name: 'TENANT_NAME', value: env.TENANT),
+          string(name: 'TIMEZONE', value: env.TIMEZONE),
+          string(name: 'EMAIL', value: env.EMAIL),
+          string(name: 'FIRST_NAME', value: env.FIRST_NAME),
+          string(name: 'LAST_NAME', value: env.LAST_NAME)
+        ]
+      }
+    }
+
+    stage('Get Tenant ID') {
+      steps {
+        script {
+          if(IS_NEW_TENANT == 'Yes') {
+            env.CURRENT_TENANT_ID = sh (script: 'cat /tmp/${TENANT}.id', returnStdout: true).trim()
+          } else {
+            env.CURRENT_TENANT_ID = env.TENANT_ID
+          }
+        }
+      }
+    }
+
+    stage('Checkout') {
+      steps {
+        echo "=> Checkout IaC Repository"
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: '*/master']],
+            userRemoteConfigs: [[
+              url: 'git@github.com:eduloginc/devops-iac-athena.git', 
+              credentialsId: 'eduloginc-git-tankhuu'
+              ]]
+          ])
+          // Set dynamic s3 prefix
+          env.S3_DEVOPS_PREFIX = "iac/cloudformation/athena/${ENV}/${TENANT}"
+        }
+      }
+    }
+
+    stage('Package Templates') {
+      steps {
+        echo "=> Package CFN Templates"
+        sh """
+          #!/bin/bash -xe
+          /usr/local/bin/aws --region ${params.REGION} cloudformation package --template-file ${MASTER_TEMPLATE} \
+          --s3-bucket ${S3_DEVOPS} --s3-prefix ${S3_DEVOPS_PREFIX} \
+          --force-upload --output-template-file ${OUTPUT_MASTER_TEMPLATE}
+        """
+        echo "=> Upload master template to S3"
+        sh """
+          #!/bin/bash -xe
+          /usr/local/bin/aws s3 cp ${OUTPUT_MASTER_TEMPLATE} s3://${S3_DEVOPS}/${S3_DEVOPS_PREFIX}/${OUTPUT_MASTER_TEMPLATE}
+        """
+      }
+    }
+
+    stage('Create CFN Stacks') {
+      environment {
+        // BE_AMI_ID = sh(script: '/usr/local/bin/get-ami-from-tag ${BE_RELEASE_VERSION}', returnStdout: true).trim()
+        TEMPLATE_URL = "https://${S3_DEVOPS}.s3.eu-west-3.amazonaws.com/${S3_DEVOPS_PREFIX}/${OUTPUT_MASTER_TEMPLATE}"
+      }
+      steps {
+        // Create CFN Master Stack
+        echo "=> Creating CFN Stacks with ${BE_AMI_ID}"
+        sh """
+          #!/bin/bash -xe
+          /usr/local/bin/aws --region ${REGION} cloudformation create-stack \
+          --stack-name ${STACK_NAME} \
+          --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+          --template-url ${TEMPLATE_URL} \
+          --tags \
+            Key=environment,Value=${ENV} \
+            Key=project,Value=${PROJECT} \
+            Key=author,Value=${AUTHOR} \
+            Key=tenant,Value=${params.TENANT} \
+          --parameters \
+            ParameterKey=KeyPairName,ParameterValue=${KEYPAIR} \
+            ParameterKey=Tenant,ParameterValue=${params.TENANT} \
+            ParameterKey=Env,ParameterValue=${ENV} \
+            ParameterKey=VPCStackName,ParameterValue=${VPC_STACK_NAME} \
+            ParameterKey=BackendAMIId,ParameterValue=${BE_AMI_ID}  \
+            ParameterKey=FEDomain,ParameterValue=${DOMAIN}  \
+            ParameterKey=FEHostedZoneId,ParameterValue=${HOSTEDZONE_ID} \
+            ParameterKey=FESSLCertificateId,ParameterValue=${SSL_CERTIFICATE_ARN} \
+            ParameterKey=BEDomain,ParameterValue=${BE_DOMAIN}  \
+            ParameterKey=BEHostedZoneId,ParameterValue=${BE_HOSTEDZONE_ID} \
+            ParameterKey=BESSLCertificateId,ParameterValue=${BE_SSL_CERTIFICATE_ARN} \
+            ParameterKey=BackendInstanceType,ParameterValue=${BE_INSTANCE_TYPE}  \
+            ParameterKey=CQAMIID,ParameterValue=${CQ_AMI_ID}  \
+            ParameterKey=CQInstanceType,ParameterValue=${CQ_INSTANCE_TYPE}  \
+            ParameterKey=DBInstanceClass,ParameterValue=${DB_INSTANCE_TYPE}  \
+            ParameterKey=DBAllocatedStorage,ParameterValue=${DB_ALLOCATE_STORAGE}  \
+            ParameterKey=DBMaxAllocatedStorage,ParameterValue=${DB_MAXALLOCATE_STORAGE}  \
+            ParameterKey=DBMasterUserPassword,ParameterValue=${params.DB_MASTER_PASSWORD} \
+            ParameterKey=DBSnapshotIdentifier,ParameterValue=${params.DB_SNAPSHOT_ID} 
+        """
+      }
+    }
+
+    stage('Wait for CFN Stacks Creation COMPLETE') {
+      steps {
+        echo "=> Wait for Master Stack Name: ${STACK_NAME} COMPLETE"
+        script {
+          try {
+            sh """
+              #!/bin/bash -xe
+              /usr/local/bin/aws --region ${REGION} cloudformation wait stack-create-complete --stack-name ${STACK_NAME}
+            """
+          }
+          catch (err) {
+              echo "Caught: ${err}"
+              throw new Exception("Wait for Stack Creation Failure!")
+          }
+        }
+      }
+    }
+
+    stage('Configure Cache-Queue Instance') {
+      environment {
+        CQ_ASG_NAME = sh(script: '/usr/local/bin/get_output_from_fr_stack ${STACK_NAME} CQASGName', returnStdout: true).trim()
+      }
+      steps {
+        echo "=> Get Cach-Queue EC2 Private IP Address from ASG ${CQ_ASG_NAME}"
+        script {
+          env.CQ_PRIVATE_IP = sh(script: '/usr/local/bin/get_ip_from_asg_fr ${CQ_ASG_NAME}', returnStdout: true).trim()
+        }
+        echo "=> Update CFN Stack with CQ Private IP Address ${CQ_PRIVATE_IP}"
+        sh "/usr/local/bin/update_stack_fr ${STACK_NAME} '{\"CQPrivateIP\":\"${CQ_PRIVATE_IP}\"}'"
+      }
+    }
+
+    // stage('Configure Debezium Connector if needed') {
+
+    // }
+
+    // stage ('Configure WOS-NOS Instance if needed') {
+
+    // }
+
+    stage('Deploy Frontend') {
+      environment {
+        FE_DOMAIN = "${PROJECT}-${params.TENANT}.${DOMAIN}"
+      }
+      steps {
+        echo "=> Deploy Frontend Package ${params.FE_RELEASE_VERSION} to ${params.TENANT}.${DOMAIN}"
+        sh 'aws s3 cp s3://${S3_ARTIFACTS}/${S3_ARTIFACTS_PREFIX}/${FE_RELEASE_VERSION}.tar.gz .'
+        sh 'tar zxvf ${FE_RELEASE_VERSION}.tar.gz'
+
+        echo "==> Update config in assets/${env.CONFIG_FILE}.json"
+        dir('dist/assets') {
+          sh 'cp ${FE_CONFIG_FILE}.json /tmp/${FE_CONFIG_FILE}.${TENANT}.json'
+          sh "update-fe-config ${FE_CONFIG_FILE} ${FE_RELEASE_VERSION} ${TENANT}"
+          sh 'cp /tmp/${FE_CONFIG_FILE}.${TENANT}.json ${FE_CONFIG_FILE}.json'
+        }
+
+        echo "==> Deploy Athena Frontend for ${params.TENANT}"
+        echo "==> Remove files on s3://${FE_DOMAIN}"
+        dir('dist') {
+          sh '''#!/bin/bash -xe
+            aws s3 rm s3://${FE_DOMAIN} --recursive
+          '''
+          echo "==> Upload files to s3://${FE_DOMAIN}"
+          sh '''#!/bin/bash -xe
+            aws s3 cp --acl public-read --recursive . s3://${FE_DOMAIN}/
+          '''
+          echo "==> Set Cache-Control for Service Worker"
+          sh '''#!/bin/bash -xe
+            aws s3 cp --acl public-read --cache-control max-age=0 ./index.html s3://{FE_DOMAIN}/
+            aws s3 cp --acl public-read --cache-control max-age=0 ./ngsw-worker.js s3://{FE_DOMAIN}/
+          '''
+        }
+      }
+    }
+    
+    // stage('Get tenant information') {
+    //   steps {
+    //     script {
+    //       env.CREATION_TIME = sh(script:'date', returnStdout: true).trim()
+    //       env.S3_TENANT = 's3://edulog-athena-devops/iac/tenants/nonprod/'
+    //     }
+    //     dir('cicd/scripts/bash') {
+    //       sh 'sh env_output.sh $TENANT'
+    //     }
+    //   }
+    // }
+    
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      // sh 'rm ${RELEASE_VERSION}.tar.gz'
+      // dir('dist') {
+      //   deleteDir()
+      // }
+    }
+    success {
+      echo "Deploy success for ${ENV} - Tenant: ${params.TENANT}"
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Send Success Message to Hangout"
+      // hangoutsNotify message: "Deploy *${currentBuild.result}*\nTenant: ${params.TENANT}\nEnvironment: ${ENV}\nDuration: ${DURATION}\nSite URL: https://${PROJECT}-${params.TENANT}.${DOMAIN}",
+      //   token: "${ATH_ENV_GCHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      echo "Deploy failed for ${ENV} - Tenant: ${params.TENANT}"
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Send Failure Message to Hangout"
+      // hangoutsNotify message: "Deploy *${currentBuild.result}*\nTenant: ${params.TENANT}\nEnvironment: ${ENV}\nDuration: ${DURATION}",
+      //   token: "${ATH_ENV_GCHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

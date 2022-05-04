@@ -1,0 +1,17 @@
+#---
+#apiVersion: networking.istio.io/v1alpha3
+#kind: VirtualService
+#metadata:
+#  name: vs-eurekaserver
+#  namespace: istio-system
+#spec:
+#  hosts:
+#  - eureka.staging.karrostech.net
+#  gateways:
+#  - karros-internal-ingress-gateway
+#  http:
+#  - route:
+#    - destination:
+#        port:
+#          number: 1112
+#        host: eureka.default.svc.cluster.local

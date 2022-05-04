@@ -1,0 +1,37 @@
+// Job Name: ath-be-deploy-legacy
+pipeline {
+  agent any
+
+  parameters {
+    choice(name: 'TENANT', choices: ['devleg', 'stageleg'], description: 'Environment to deploy')
+    string(name: 'RELEASE_VERSION', description: 'QA/QC Image Tag for the Release Version of Backend. Ex: BE-1.0.0')
+  }
+
+  environment {
+    ENV = 'legacy'
+  }
+
+  stages {
+    stage('Deploy') {
+      steps {
+        echo "==> Update new AMI into ${env.ENV} CFN Stack of Tenant: ${params.TENANT}"
+        sh '''#!/bin/bash
+          /usr/local/bin/deploy-legacy ${TENANT} ${RELEASE_VERSION}
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Deploy success for Environment: ${ENV} on Tenant: ${env.TENANT}"
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nTenant: ${TENANT}\nRelease-Version: ${RELEASE_VERSION}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      echo "Deploy failure for Environment: ${ENV} on Tenant: ${env.TENANT}"
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nTenant: ${TENANT}\nRelease-Version: ${RELEASE_VERSION}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

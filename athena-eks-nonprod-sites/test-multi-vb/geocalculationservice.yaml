@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: geocalculationservice
+  labels:
+    svc: geocalculationservice
+spec:
+  selector:
+    app: geocalculationservice
+  ports:
+  - protocol: TCP
+    port: 8077
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geocalculationservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+  labels:
+    name: geocalculationservice
+    scheduling: vn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geocalculationservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: geocalculationservice
+        app: geocalculationservice
+    spec:
+      nodeSelector:
+        nodeType: scheduling-vn
+      tolerations:
+      - effect: NoSchedule
+        operator: Equal
+        key: scheduling
+        value: vn
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/geocalculation:1.46.3
+        name: geocalculationservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - >-
+            . /home/athena/athena.env && java 
+            -Dspring.profiles.active=eks
+            -jar -XX:+UseG1GC -Xms256m -Xmx512m /home/athena/app.jar
+            --nos.server=${NOS_HOST}
+            --nos.port=${NOS_PORT}
+        ports:
+        - containerPort: 8077
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: geocalculationservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: geocalculationservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

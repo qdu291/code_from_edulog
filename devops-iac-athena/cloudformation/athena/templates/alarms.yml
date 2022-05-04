@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Athena CloudWatch Alarms Template
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+  RDSDBIdentifier:
+    Description: RDS PostgreSQL DB Identifier
+    Type: String
+  AlarmTopic:
+    Description: SNS Topic for Alarm
+    Type: String
+Resources:
+  RDSFreeStorageSpace:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: !Sub ${Tenant}-RDSDiskUsage
+      AlarmDescription: "Alarm on RDS FreeStorageSpace"
+      ComparisonOperator: LessThanThreshold
+      DatapointsToAlarm: 1
+      Dimensions: 
+      - Name: DBInstanceIdentifier
+        Value: !Ref RDSDBIdentifier
+      EvaluationPeriods: 1
+      MetricName: FreeStorageSpace
+      Namespace: AWS/RDS
+      Period: 300
+      Statistic: Average
+      Threshold: 10240000000
+      OKActions: 
+      - !Ref AlarmTopic
+      InsufficientDataActions: 
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  RDSTransactionLogDiskUsage:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: !Sub ${Tenant}-RDSTransactionLogDiskUsage
+      AlarmDescription: "Alarm on RDS Transaction Log Disk Usage"
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: 1
+      Dimensions: 
+      - Name: DBInstanceIdentifier
+        Value: !Ref RDSDBIdentifier
+      EvaluationPeriods: 1
+      MetricName: TransactionLogsDiskUsage
+      Namespace: AWS/RDS
+      Period: 300
+      Statistic: Average
+      Threshold: 10240000000
+      OKActions:
+      - !Ref AlarmTopic
+      InsufficientDataActions:
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  CommandDistributorError:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Tenant}-CommandDistributorError
+      AlarmDescription: "Alarm for athena command distributor error"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      Dimensions:
+      - Name: Tenant
+        Value: !Ref Tenant
+      EvaluationPeriods: 1
+      MetricName: command_sourcing_error
+      Namespace: Alerting/CommandDistributor
+      Period: 300
+      Statistic: Average
+      Threshold: 1
+      TreatMissingData: notBreaching
+      OKActions:
+      - !Ref AlarmTopic
+      InsufficientDataActions:
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  CommandDistributorFailure:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Tenant}-CommandDistributorFailure
+      AlarmDescription: "Alarm for athena command distributor failure"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      Dimensions:
+      - Name: Tenant
+        Value: !Ref Tenant
+      EvaluationPeriods: 1
+      MetricName: command_sourcing_failure
+      Namespace: Alerting/CommandDistributor
+      Period: 300
+      Statistic: Average
+      Threshold: 1
+      TreatMissingData: notBreaching
+      OKActions:
+      - !Ref AlarmTopic
+      InsufficientDataActions:
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  CommandDistributorDBException:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Tenant}-CommandDistributorDBException
+      AlarmDescription: "Alarm for athena command distributor DB exception"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      Dimensions:
+      - Name: Tenant
+        Value: !Ref Tenant
+      EvaluationPeriods: 1
+      MetricName: command_distributor_db_exception
+      Namespace: Alerting/CommandDistributor
+      Period: 300
+      Statistic: Average
+      Threshold: 1
+      TreatMissingData: notBreaching
+      OKActions:
+      - !Ref AlarmTopic
+      InsufficientDataActions:
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  CommandDistributorInitError:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Tenant}-CommandDistributorInitError
+      AlarmDescription: "Alarm for athena command distributor initialization error"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      Dimensions:
+      - Name: Tenant
+        Value: !Ref Tenant
+      EvaluationPeriods: 1
+      MetricName: command_distributor_init_error
+      Namespace: Alerting/CommandDistributor
+      Period: 300
+      Statistic: Average
+      Threshold: 1
+      TreatMissingData: notBreaching
+      OKActions:
+      - !Ref AlarmTopic
+      InsufficientDataActions:
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+  AthenaRoutingElasticSearchSnapshotError:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${Tenant}-AthenaRoutingElasticSearchSnapshotError
+      AlarmDescription: "Alarm for routing backend ElasticSearch Snapshot error"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: 1
+      Dimensions:
+      - Name: Tenant
+        Value: !Ref Tenant
+      EvaluationPeriods: 1
+      MetricName: routing_elastic_search_snapshot_error
+      Namespace: Alerting/Routing
+      Period: 300
+      Statistic: Average
+      Threshold: 1
+      TreatMissingData: notBreaching
+      OKActions:
+      - !Ref AlarmTopic
+      InsufficientDataActions:
+      - !Ref AlarmTopic
+      AlarmActions:
+      - !Ref AlarmTopic
+
+# Outputs:

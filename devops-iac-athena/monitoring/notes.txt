@@ -1,0 +1,27 @@
+
+Tenant: dev | stage | demo | devleg | stageleg
+  Tier: frontend | backend | database | queue | cache
+    frontend:
+      
+
+
+# Frontend URLs:
+https://athena-dev.karrostech.io/assets/img/main-logo-circle.png
+https://athena-stage.karrostech.io/assets/img/main-logo-circle.png
+https://athena-demo.karrostech.io/assets/img/main-logo-circle.png
+https://athena-devleg.karrostech.io/assets/img/main-logo-circle.png
+https://athena-stageleg.karrostech.io/assets/img/main-logo-circle.png
+https://athena-edulog.karrostech.io/assets/img/main-logo-circle.png
+
+
+# Backend URLs:
+https://ath-be-dev.karrostech.net/
+  content: {"status":"UP"}
+https://ath-be-stage.karrostech.net/
+  content: {"status":"UP"}
+https://ath-be-demo.karrostech.net/
+  content: {"status":"UP"}
+https://ath-be-devleg.karrostech.net/
+  content: {"status":"UP"}
+https://ath-be-stageleg.karrostech.net/
+  content: {"status":"UP"}

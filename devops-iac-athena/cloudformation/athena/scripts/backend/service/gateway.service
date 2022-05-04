@@ -1,0 +1,13 @@
+[Unit]
+Description=Athena Middle Services
+After=network.target
+
+[Service]
+ExecStartPre=/bin/sleep 5
+Type=simple
+ExecStart=/opt/athena/run/gateway.sh
+User=root
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

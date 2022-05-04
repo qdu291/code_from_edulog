@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+import boto3
+import sys
+
+if __name__ == "__main__":
+    try:
+        project = 'athena'
+        author = 'devops'
+        release_version = sys.argv[1]
+        filters = [
+            {'Name': 'tag:project', 'Values': [project]},
+            {'Name': 'tag:author', 'Values': [author]},
+            {'Name': 'tag:image_type', 'Values': ['release']},
+            {'Name': 'tag:release_version', 'Values': [release_version]},
+        ]
+
+        # Get image_id
+        ec2 = boto3.client('ec2')
+        response = ec2.describe_images(Filters=filters)
+        images = response.get('Images')
+        if images:
+            image = images[0]
+            if image:
+                image_id = image.get('ImageId')
+                print(image_id)
+    except Exception as e:
+        print("tag_image.failed: ", e)
+        exit(1)
+

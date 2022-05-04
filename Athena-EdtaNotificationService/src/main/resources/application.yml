@@ -1,0 +1,38 @@
+server:
+  port: 9400
+
+spring.application.name: EDTANOTIFICATIONSERVICE
+
+ribbon.eureka.enabled: false
+
+eureka:
+  instances: http://localhost:1112/eureka/
+  client:
+    serviceUrl:
+      defaultZone: ${eureka.instances}
+      healthcheck:
+        enabled: true
+
+management.health.defaults.enabled: false
+management.endpoints.enabled-by-default: true
+management.endpoints.web.exposure.include: "*"
+management.endpoints.web.base-path: /
+management.health.elasticsearch.enabled: false
+
+kafka:
+  athena-bootstrap-msk: b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092, b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+  applicationId: edtaNotification
+  consumer-group: edtaNotification-consumer-group-local
+  consumer:
+    edtaGeneral: edta-general-local
+  producer:
+    edtaGeneral: edta-general-local
+
+mqtt:
+  certificateFile: /aws/edc3963789-certificate.pem.crt
+  privateKeyFile: /aws/edc3963789-private.pem.key
+  endPoint: a252i0mwothm9t-ats.iot.us-west-2.amazonaws.com
+  clientId: edta_notification
+
+channels:
+  general: local/edta

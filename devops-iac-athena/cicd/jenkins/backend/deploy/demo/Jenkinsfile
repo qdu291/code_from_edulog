@@ -1,0 +1,36 @@
+// Job Name: ath-be-deploy-demo
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'RELEASE_VERSION', description: 'QA/QC Image Tag for the Release Version of Backend. Ex: BE-1.0.0')
+  }
+
+  environment {
+    ENV = 'demo'
+  }
+
+  stages {
+    stage('Deploy') {
+      steps {
+        echo "==> Update new AMI into ${env.ENV} CFN Stack"
+        sh '''#!/bin/bash
+          /usr/local/bin/deploy-demo ${RELEASE_VERSION}
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Deploy success for Environment: ${ENV}"
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nRelease-Version: ${RELEASE_VERSION}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      echo "Deploy failure for Environment: ${ENV}"
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nRelease-Version: ${RELEASE_VERSION}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

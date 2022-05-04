@@ -1,0 +1,22 @@
+#!/bin/bash -xe
+
+
+# VARIABLES #
+BUILD_VERSION=$1
+RELEASE_VERSION=$2
+S3_ARTIFACTS_BUCKET="edulog-athena-artifacts"
+S3_URI="s3://${S3_ARTIFACTS_BUCKET}/frontend/webquery"
+VERSION_FILE="/var/lib/jenkins/athena/versions/release_webquery.txt"
+
+# EXECUTE #
+TAGS="{\"TagSet\":[{\"Key\":\"project\",\"Value\":\"athena\"},{\"Key\":\"service\",\"Value\":\"webquery\"},{\"Key\":\"author\",\"Value\":\"ktvn-devops\"},{\"Key\":\"type\",\"Value\":\"release\"},{\"Key\":\"build_version\",\"Value\":\"${BUILD_VERSION}\"}]}"
+# COPY BUILD_VERSION TO RELEASE_VERSION
+aws s3 cp ${S3_URI}/build/${BUILD_VERSION}.tar.gz ${S3_URI}/release/${RELEASE_VERSION}.tar.gz
+# TAG RELEASE_VERSION
+aws s3api put-object-tagging \
+    --bucket $S3_ARTIFACTS_BUCKET \
+    --key frontend/webquery/release/${RELEASE_VERSION}.tar.gz \
+    --tagging $TAGS
+
+# ADD RELEASE_VERSION TO NOTE
+awk -v rv=$RELEASE_VERSION -i inplace 'BEGINFILE{print rv}{print}' $VERSION_FILE

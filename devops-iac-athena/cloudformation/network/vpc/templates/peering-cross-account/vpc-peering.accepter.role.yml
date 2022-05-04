@@ -1,0 +1,34 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Accepter Role for VPC Peering Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+Parameters:
+  RequesterAccountId:
+    Type: String
+    Description: Requester AWS AccountId
+Resources:
+  peerRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Principal:
+              AWS: !Ref RequesterAccountId
+            Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "ec2:AcceptVpcPeeringConnection"
+                Resource: "*"
+Outputs:
+  RoleARN:
+    Value: !GetAtt
+      - peerRole
+      - Arn

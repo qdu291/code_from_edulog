@@ -1,0 +1,174 @@
+// Job Name: ath-fe-cicd-dev
+pipeline {
+  agent any
+
+  triggers {
+    pollSCM('H/5 * * * *') // poll SCM every 5 minutes
+  }
+
+  environment {
+    ENV = 'dev'
+    CONFIG_FILE = 'systemconfig'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def scmVars = checkout([
+            $class: 'GitSCM', 
+            branches: [[name: '*/kt-sprint-23']],
+            userRemoteConfigs: [[
+              url: 'git@github.com:eduloginc/EduLog-AthenaUI-v1_2.git', 
+              credentialsId: 'eduloginc-git-tankhuu'
+              ]]
+          ])
+          // Set env GIT_COMMIT & SHORT_COMMIT & BUILD_VERSION
+          env.GIT_COMMIT = scmVars.GIT_COMMIT
+          env.SHORT_COMMIT = scmVars.GIT_COMMIT.substring(0,7)
+          env.BUILD_VERSION = "${SHORT_COMMIT}.${BUILD_NUMBER}"
+        }
+      }
+    }
+    // stage('Code Analysis') {
+    //   steps { 
+    //     script {
+    //       def scannerHome = tool 'SonarScanner 4.3';
+    //       echo "==> Analysis Code with SonarQube"
+    //       withSonarQubeEnv('ATH_SONARQUBE') {
+    //         sh "${scannerHome}/bin/sonar-scanner -Dsonar.sources=src -Dsonar.projectVersion=${SHORT_COMMIT} -Dsonar.sourceEncoding=UTF-8 -Dsonar.projectName=\"Athena UI\" -Dsonar.projectKey=athena-ui"
+    //       }
+    //       echo "==> Quality Gate with SonarQube"
+    //       timeout(time: 1, unit: 'HOURS') {
+    //         waitForQualityGate abortPipeline: true
+    //       }
+    //     }
+    //   }
+    // }
+    stage('Build') {
+      steps {
+        echo "==> Build Athena Frontend for ${env.ENV}"
+        // sh '''#!/bin/bash -xe
+        //   cp -p /opt/athena/config/${ENV}/app.stompconfig.ts src/app/app.stompconfig.ts
+        // '''
+        sh 'npm install > /dev/null'
+        sh 'npm run postinstall'
+        // Make sure building angularjs jobs not run at the same time
+        lock('ATH_FE_BUILDER') {
+          echo "==> Building..."
+          sh 'npm run build:prod'
+        }
+      }
+    }
+    stage('Configure') {
+      steps {
+        echo "==> Update config in assets/${env.CONFIG_FILE}.json"
+        dir('dist/assets') {
+          sh 'cp ${CONFIG_FILE}.json /tmp/${CONFIG_FILE}.${ENV}.json'
+          sh "update-fe-config ${CONFIG_FILE} ${SHORT_COMMIT} ${ENV}"
+          sh 'cp /tmp/${CONFIG_FILE}.${ENV}.json ${CONFIG_FILE}.json'
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        dir('dist') {
+          echo "==> Deploy Athena Frontend for ${env.ENV}"
+          echo "==> Remove files on s3://athena-${env.ENV}.${env.ATH_FE_DOMAIN}"
+          sh '''#!/bin/bash -xe
+            aws s3 rm s3://athena-${ENV}.${ATH_FE_DOMAIN} --recursive
+          '''
+          echo "==> Upload files to s3://athena-${env.ENV}.${env.ATH_FE_DOMAIN}"
+          sh '''#!/bin/bash -xe
+            aws s3 cp --acl public-read --recursive . s3://athena-${ENV}.${ATH_FE_DOMAIN}/
+          '''
+          echo "==> Set Cache-Control for Service Worker"
+          sh '''#!/bin/bash -xe
+            aws s3 cp --acl public-read --cache-control max-age=0 ./index.html s3://athena-${ENV}.${ATH_FE_DOMAIN}/
+            aws s3 cp --acl public-read --cache-control max-age=0 ./ngsw-worker.js s3://athena-${ENV}.${ATH_FE_DOMAIN}/
+          '''
+          echo "==> Invalidate Cloudfront ${env.ATH_DEV_CF_ID}"
+          sh '''#!/bin/bash -xe
+            aws cloudfront create-invalidation --distribution-id ${ATH_DEV_CF_ID} --paths \"/*\"
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      cleanWs()
+    }
+    success {
+      echo "Deploy success for ${ENV}"
+      echo "==> Send Git Status Check Success"
+      sh "printenv"
+      sh "send-git-status ${GIT_USERNAME} ${ATH_FRONTEND_REPO_NAME} ${GIT_COMMIT} ${GIT_STATUS_ACCESS_TOKEN} success ${JOB_BASE_NAME} ${BUILD_NUMBER}"
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+    //   hangoutsNotify message: "<users/all>", token: "${ATH_GCHAT_FE_TOKEN}", threadByJob: true
+      hangoutsNotify message: "*${currentBuild.result}*\nEnvironment: ${ENV}\nCommit: ${SHORT_COMMIT}\nDuration: ${DURATION}",
+        token: "${ATH_GCHAT_FE_TOKEN}", threadByJob: true
+    //   echo "==> Send Success Message to Slack"
+    //   script {
+    //     def blocks = [
+    //       [
+    //         "type": "section",
+    //         "text": [
+    //           "type": "mrkdwn",
+    //           "text": ":rocket: *${JOB_NAME} #${BUILD_NUMBER}*"
+    //         ]
+    //       ],
+    //         [
+    //         "type": "divider"
+    //       ],
+    //       [
+    //         "type": "section",
+    //         "text": [
+    //           "type": "mrkdwn",
+    //           "text": "Status: *${currentBuild.result}*\nEnvironment: `${ENV}`\nCommit: `${SHORT_COMMIT}`\nDuration: `${DURATION}`"
+    //         ]
+    //       ]
+    //     ]
+    //     slackSend(channel: "#${ATH_SLACK_NOTIFICATION_CHANNEL}", blocks: blocks)
+    //   }
+    }
+    failure {
+      echo "Deploy failed for ${ENV}"
+      echo "==> Send Git Status Check Failure"
+      sh "send-git-status ${GIT_USERNAME} ${ATH_FRONTEND_REPO_NAME} ${GIT_COMMIT} ${GIT_STATUS_ACCESS_TOKEN} failure ${JOB_BASE_NAME} ${BUILD_NUMBER}"
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+    //   hangoutsNotify message: "<users/all>", token: "${ATH_GCHAT_FE_TOKEN}", threadByJob: true
+      hangoutsNotify message: "<users/all> *${currentBuild.result}*\nEnvironment: ${ENV}\nCommit: ${SHORT_COMMIT}\nDuration: ${DURATION}",
+        token: "${ATH_GCHAT_FE_TOKEN}", threadByJob: true
+    //   echo "==> Send Failure Message to Slack"
+    //   script {
+    //     def blocks = [
+    //       [
+    //         "type": "section",
+    //         "text": [
+    //           "type": "mrkdwn",
+    //           "text": ":rocket: *${JOB_NAME} #${BUILD_NUMBER}*"
+    //         ]
+    //       ],
+    //         [
+    //         "type": "divider"
+    //       ],
+    //       [
+    //         "type": "section",
+    //         "text": [
+    //           "type": "mrkdwn",
+    //           "text": "<!channel> Status: *${currentBuild.result}*\nEnvironment: `${ENV}`\nCommit: `${SHORT_COMMIT}`\nDuration: `${DURATION}`"
+    //         ]
+    //       ]
+    //     ]
+    //     slackSend(channel: "#${ATH_SLACK_NOTIFICATION_CHANNEL}", blocks: blocks)
+    //   }
+    }
+  }
+}

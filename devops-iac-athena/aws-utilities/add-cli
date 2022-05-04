@@ -1,0 +1,6 @@
+#!/bin/bash -xe
+
+echo "Adding CLI folder into Mac Path"
+sudo echo `pwd`/cli /etc/paths
+
+echo "CLI added, you can open new terminal to use utilities!"

@@ -1,0 +1,24 @@
+Tue Mar 10 05:33:10 2020 1.53.157.66:47879 TLS: Initial packet from [AF_INET]1.53.157.66:47879, sid=4dc08b91 99e6c30e
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 VERIFY OK: depth=1, C=VN, ST=TB, L=HCM, O=TC, OU=DevOps, CN=TC CA, name=server, emailAddress=devops@karrostech.com
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 VERIFY OK: depth=0, C=VN, ST=TB, L=HCM, O=TC, OU=DevOps, CN=tan.khuu, name=server, emailAddress=devops@karrostech.com
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_VER=2.4.7
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_PLAT=mac
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_PROTO=2
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_NCP=2
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_LZ4=1
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_LZ4v2=1
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_LZO=1
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_COMP_STUB=1
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_COMP_STUBv2=1
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_TCPNL=1
+Tue Mar 10 05:33:11 2020 1.53.157.66:47879 peer info: IV_GUI_VER="net.tunnelblick.tunnelblick_5400_3.8.1__build_5400)"
+Tue Mar 10 05:33:12 2020 1.53.157.66:47879 Control Channel: TLSv1.2, cipher TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384, 2048 bit RSA
+Tue Mar 10 05:33:12 2020 1.53.157.66:47879 [tan.khuu] Peer Connection Initiated with [AF_INET]1.53.157.66:47879
+Tue Mar 10 05:33:12 2020 tan.khuu/1.53.157.66:47879 MULTI_sva: pool returned IPv4=10.8.0.6, IPv6=(Not enabled)
+Tue Mar 10 05:33:12 2020 tan.khuu/1.53.157.66:47879 MULTI: Learn: 10.8.0.6 -> tan.khuu/1.53.157.66:47879
+Tue Mar 10 05:33:12 2020 tan.khuu/1.53.157.66:47879 MULTI: primary virtual IP for tan.khuu/1.53.157.66:47879: 10.8.0.6
+Tue Mar 10 05:33:13 2020 tan.khuu/1.53.157.66:47879 PUSH: Received control message: 'PUSH_REQUEST'
+Tue Mar 10 05:33:13 2020 tan.khuu/1.53.157.66:47879 SENT CONTROL [tan.khuu]: 'PUSH_REPLY,route 172.16.0.0 255.255.0.0,route 10.8.0.1,topology net30,ping 10,ping-restart 120,ifconfig 10.8.0.6 10.8.0.5,peer-id 0,cipher AES-256-GCM' (status=1)
+Tue Mar 10 05:33:13 2020 tan.khuu/1.53.157.66:47879 Data Channel: using negotiated cipher 'AES-256-GCM'
+Tue Mar 10 05:33:13 2020 tan.khuu/1.53.157.66:47879 Outgoing Data Channel: Cipher 'AES-256-GCM' initialized with 256 bit key
+Tue Mar 10 05:33:13 2020 tan.khuu/1.53.157.66:47879 Incoming Data Channel: Cipher 'AES-256-GCM' initialized with 256 bit key

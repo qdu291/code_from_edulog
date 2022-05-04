@@ -1,0 +1,16 @@
+#!/bin/bash -xe
+
+# VARIABLES
+PROJECT=athena
+USER=ubuntu
+IP=$1
+
+# MAIN
+if [ $PROJECT == "athena" ]; then
+  SSH_KEY="athena-devops.pem"
+fi
+if [ $PROJECT == "athena-prod" ]; then
+  SSH_KEY="edulogvn-devops-ohio.pem"
+fi
+
+/usr/bin/ssh -i /Users/tankhuu/.ssh/${SSH_KEY} ${USER}@${IP}

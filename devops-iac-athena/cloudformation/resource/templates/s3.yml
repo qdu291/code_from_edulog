@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EdulogVN S3 Resources Template
+Resources:
+  EdulogVNArtifactsBucket:
+    Description: Bucket store Artifacts with lifecyle
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: edulogvn-artifacts
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteArtifactsAfter180Days
+            Status: Enabled
+            ExpirationInDays: 180
+      Tags:
+        - Key: Lifetime
+          Value: 1day
+  EdulogVNDevOpsBucket:
+    Description: Bucket store DevOps Stuff for EdulogVN
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: edulogvn-devops
+      Tags:
+        - Key: author
+          Value: tan.khuu
+        - Key: environment
+          Value: management
+
+  AthenaMaintenancePageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: edulogvn-athena-maintenance
+      AccessControl: PublicRead
+      Tags:
+        - Key: author
+          Value: tan.khuu
+        - Key: type
+          Value: static-website
+        - Key: environment
+          Value: management
+
+Outputs:
+  EdulogVNArtifactsBucket:
+    Description: EdulogVN Artifacts Bucket
+    Value: !Ref EdulogVNArtifactsBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-EdulogVNArtifactsBucket

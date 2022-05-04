@@ -1,0 +1,62 @@
+#!/bin/bash
+if [ -n "$ENV" ] && [ $ENV = "prod" ] && [ -n "$KARROS_GATEWAY" ]; then
+  sudo java \
+    -Dmanagement.context-path=/ \
+    -Dmanagement.endpoints.web.base-path=/ \
+    -Dmanagement.endpoints.web.exposure.include="*" \
+    -Dkarros.env=${ENV} \
+    -Dathena.env.name=${ENV} \
+    -Dkarros.general.url="https://${KARROS_GATEWAY}" \
+    -Dkarros.login.url="https://${KARROS_GATEWAY}/api/v1/signin" \
+    -Dkarros.keycloak.clientid=${KEYCLOAK_BACKEND_ID} \
+    -Dkarros.keycloak.clientsecret=${KEYCLOAK_SECRET} \
+    -Dkarros.keycloak.url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/token \
+    -Dkarros.keycloak.logouturl=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/logout \
+    -Dkarros.keycloak.forgotpasswordurl=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/karros-auth/forgot-password \
+    -Dtransactionhub.mongodb.host=${CACHE_HOST} \
+    -Duser.mongodb.host=${CACHE_HOST} \
+    -Dspring.rabbitmq.host=${QUEUE_HOST} \
+    -Dspring.rabbitmq.username=${QUEUE_USER} \
+    -Dspring.rabbitmq.password=${QUEUE_PASS} \
+    -Dopt.host="${NOS_HOST}" \
+    -Dathena.tenant.id=${TENANT_ID} \
+    -Dtransactionhub.es.url=${ES_URL} \
+    -Dtransactionhub.es.username=${ES_USERNAME} \
+    -Dtransactionhub.es.password=${ES_PASSWORD} \
+    -Dtransactionhub.es.protocol=${ES_PROTOCOL} \
+    -Dtransactionhub.es.connectionTimeout=${ES_CONNECTIONTIMEOUT} \
+    -Dtransactionhub.es.socketTimeout=${ES_SOCKETTIMEOUT} \
+    -Dtransactionhub.es.parallelESCountThreads=${ES_PARALELLESTHREADCOUNT} \
+    -Dtransactionhub.es.port=${ES_PORT} \
+    -Dtransactionhub.es.run.index=${ES_RUN_INDEX} \
+    -Dtransactionhub.es.trip.index=${ES_TRIP_INDEX} \
+    -Dtransactionhub.es.snapshot.read.enabled=${ES_SNAPSHOT_ENABLED} \
+    -Dopt.port="8801" \
+    -jar -XX:+UseG1GC -Xms256m -Xmx1024m /opt/athena/src/TransactionHUBV2.jar
+else
+  sudo java \
+    -Dmanagement.context-path=/ \
+    -Dmanagement.endpoints.web.base-path=/ \
+    -Dmanagement.endpoints.web.exposure.include="*" \
+    -Dtransactionhub.mongodb.host=${CACHE_HOST} \
+    -Duser.mongodb.host=${CACHE_HOST} \
+    -Dspring.rabbitmq.host=${QUEUE_HOST} \
+    -Dspring.rabbitmq.username=${QUEUE_USER} \
+    -Dspring.rabbitmq.password=${QUEUE_PASS} \
+    -Dathena.env.name=${ENV} \
+    -Dopt.host="${NOS_HOST}" \
+    -Dathena.tenant.id=${TENANT_ID} \
+    -Dtransactionhub.es.url=${ES_URL} \
+    -Dtransactionhub.es.username=${ES_USERNAME} \
+    -Dtransactionhub.es.password=${ES_PASSWORD} \
+    -Dtransactionhub.es.protocol=${ES_PROTOCOL} \
+    -Dtransactionhub.es.connectionTimeout=${ES_CONNECTIONTIMEOUT} \
+    -Dtransactionhub.es.socketTimeout=${ES_SOCKETTIMEOUT} \
+    -Dtransactionhub.es.parallelESCountThreads=${ES_PARALELLESTHREADCOUNT} \
+    -Dtransactionhub.es.port=${ES_PORT} \
+    -Dtransactionhub.es.run.index=${ES_RUN_INDEX} \
+    -Dtransactionhub.es.trip.index=${ES_TRIP_INDEX} \
+    -Dtransactionhub.es.snapshot.read.enabled=${ES_SNAPSHOT_ENABLED} \
+    -Dopt.port="8801" \
+    -jar -XX:+UseG1GC -Xms256m -Xmx1024m /opt/athena/src/TransactionHUBV2.jar
+fi

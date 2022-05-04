@@ -1,0 +1,31 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena ECS Cluster Definition Template
+Parameters:
+  Env:
+    Description: Environment that we want to deploy in Athena Project
+    Type: String
+    AllowedValues:
+      - "nonprod"
+      - "prod"
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub athena-ecs-${Env}
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: environment
+          Value: !Ref Env
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+Outputs:
+  ECSClusterName:
+    Description: Name of ECS Cluster
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub ${AWS::StackName}-ECSClusterName

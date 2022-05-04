@@ -1,0 +1,73 @@
+configMap:
+  envType: "nonprod"
+  siteName: ""
+  tenantId: ""
+  karrosGateway: "athenagateway-p01-demo.usw2.karrostech.net"
+  keycloakDomain: "aaa-demo.usw2.karrostech.net"
+  dbHost: ""
+  dbName: "Athena"
+  kafkaBootstrapServers: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  athenaKafkaProducers: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  athenaKafkaConsumers: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  geoServerHost: "geoserverservice"
+  geoServerPort: "8070"
+  nosHost: ""
+  nosPort: "8901"
+  cacheHost: "mongodb"
+  queueHost: "rabbitmq"
+  queueUser: "edulog"
+  queuePass: "edul0g"
+  dbUser: "edulog"
+  dbPass: "edul0g"
+  keycloakId: "athena"
+  keycloakBackendId: "athena-backend"
+  keycloadSecret: "4fc89ec7-3af8-4649-a014-529ef2975805"
+
+
+aggregateservice:
+  image:
+    tag: "latest"
+edtaservice:
+  image:
+    tag: "latest"
+gateway:
+  image:
+    tag: "latest"
+geocalculationservice:
+  image:
+    tag: "latest"
+importingservice:
+  image:
+    tag: "latest"
+ivinservice:
+  image:
+    tag: "latest"
+overlayservice:
+  image:
+    tag: "latest"
+routingservice:
+  image:
+    tag: "latest"
+geocodeservice:
+  image:
+    tag: "latest"
+plannedrolloverservice:
+  image:
+    tag: "latest"
+reportservice:
+  image:
+    tag: "latest"
+routingmigration:
+  image:
+    tag: "latest"
+rresservice:
+  image:
+    tag: "latest"
+tnxhubservice:
+  image:
+    tag: "latest"
+
+tags:
+  core: false
+  rideRegistration: false
+  mapOverlay: false

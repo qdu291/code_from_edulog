@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: argocd
+  namespace: istio-system
+spec:
+  hosts:
+  - argocd.eks-dev.athena-nonprod.com
+  gateways:
+  - athena-ingress-gateway
+  http:
+  - route:
+    - destination:
+        port:
+          number: 80 # can be omitted if it's the only port for reviews
+        host: argocd-server.argocd.svc.cluster.local

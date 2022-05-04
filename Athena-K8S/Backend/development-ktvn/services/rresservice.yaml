@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: development-ktvn
+  name: rresservice
+  labels:
+    svc: rresservice
+spec:
+  selector:
+    app: rresservice
+  ports:
+  - protocol: TCP
+    port: 8086
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: development-ktvn
+  name: rresservice
+
+  labels:
+    name: rresservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rresservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: rresservice
+        app: rresservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/rres:885b76b2c921e4c985537eeb1d15544066960ae7
+        name: rresservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - . /home/athena/athena.env;java -Dserver.tomcat.mbeanregistry.enabled=true -jar -Dspring.profiles.active=eks -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar  --kafka.bootstrap-servers=${ATHENA_KAFKA_CONSUMERS}  --kafka.consumer.topics=${TENANT_ID}-rideRegistrationChange  --mongo.url=mongodb://${CACHE_HOST}:27017/?uuidRepresentation=STANDARD  --application.athena.tenant.id=${TENANT_ID}  --application.karros.login.url=https://${KARROS_GATEWAY}/api/v1/signin  --application.karros.keycloak.client-id=${KEYCLOAK_ID}  --application.karros.keycloak.client-secret=${KEYCLOAK_SECRET}  --application.karros.keycloak.url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/token  --application.karros.keycloak.logout-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/logout  --application.karros.keycloak.forgot-password-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/karros-auth/forgot-password
+        ports:
+        - containerPort: 8086
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rresservice
+  namespace: development-ktvn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rresservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

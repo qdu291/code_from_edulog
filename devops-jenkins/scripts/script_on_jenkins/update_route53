@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+import boto3
+import sys
+
+hostZone = sys.argv[1]
+be_url = sys.argv[2]
+be_url_alb = sys.argv[3]
+
+if __name__ == "__main__":
+    try:
+        # Get image_id
+        client = boto3.client('route53')
+        response = client.change_resource_record_sets(
+          HostedZoneId=hostZone,
+          ChangeBatch={
+            'Comment': 'Update DNS Name for backend',
+            'Changes': [
+              {
+                'Action': 'CREATE',
+                'ResourceRecordSet': {
+                  'Name': be_url,
+                  'Type': 'CNAME',
+                  'TTL': 300,
+                  'ResourceRecords': [
+                    {
+                      'Value': be_url_alb,
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        )
+    except Exception as e:
+        print("Update dns error: ", e)
+        exit(1)

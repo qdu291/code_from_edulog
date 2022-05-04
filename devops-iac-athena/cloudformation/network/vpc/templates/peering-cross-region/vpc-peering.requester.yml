@@ -1,0 +1,67 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Source VPC Peering Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Requester Peering Configuration
+        Parameters:
+          - ReqVpcStackName
+      - Label:
+          default: Accepter Peering Configuration
+        Parameters:
+          - PeerVPCRegion
+          - PeerVPCId
+          - PeerVPCCIDR
+    ParameterLabels:
+      ReqVpcStackName:
+        default: "Requester VPC Stack Name"
+      PeerVPCRegion:
+        default: "Accepter AWS Region of VPC"
+      PeerVPCId:
+        default: "Accepter VPC Id"
+      PeerVPCCIDR:
+        default: "Accepter VPC CIDR"
+Parameters:
+  # Requester
+  ReqVpcStackName:
+    Type: String
+    Description: Source VPC Stack Name
+  # Accepter
+  PeerVPCRegion:
+    Type: String
+    Description: Accepter VPC Region
+  PeerVPCId:
+    Type: String
+    Description: Accepter VPC ID
+  PeerVPCCIDR:
+    Type: String
+    Description: Accepter VPC CIDR
+Resources:
+  # VPC Peering
+  vpcPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub ${ReqVpcStackName}-VPCID
+      PeerRegion: !Ref PeerVPCRegion
+      PeerVpcId: !Ref PeerVPCId
+      # Tags:
+      #   - Key: Name
+      #     Value: AthNonProdPeerProd
+      #   - Key: project
+      #     Value: athena
+  peerSourcePublicSubnetRoute:
+    Description: Add route for Public Subnet of Requester
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        "Fn::ImportValue": !Sub ${ReqVpcStackName}-PublicSubnetRouteTable
+      DestinationCidrBlock: !Ref PeerVPCCIDR
+      VpcPeeringConnectionId: !Ref vpcPeeringConnection
+Outputs:
+  VpcPeeringConnectionId:
+    Description: VPC Peering Connection Id
+    Value: !Ref vpcPeeringConnection

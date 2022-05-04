@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ktvn
+  name: edtaservice
+  labels:
+    svc: edtaservice
+spec:
+  selector:
+    app: edtaservice
+  ports:
+  - protocol: TCP
+    port: 8083
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ktvn
+  name: edtaservice
+
+  labels:
+    name: edtaservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edtaservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: edtaservice
+        app: edtaservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/timeattendance:ab69030ce2455516976833f09bdf9b6283658359
+        name: edtaservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - . /home/athena/athena.env;java -Dspring.profiles.active=eks -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar
+        ports:
+        - containerPort:  8083
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        imagePullPolicy: Always
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: edtaservice
+  namespace: ktvn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: edtaservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50

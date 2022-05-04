@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+import boto3
+import sys
+from botocore.config import Config
+
+if __name__ == "__main__":
+    try:
+        stack_name = sys.argv[1]
+        output_key = sys.argv[2]
+        value = ''
+
+        config = Config(region_name='eu-west-3')
+        aws_cfn = boto3.client('cloudformation', config=config)
+        # Use for test
+        # session = boto3.Session(profile_name='tankhuu-athena')
+        # aws_cfn = session.client('cloudformation')
+
+        cfn_resp = aws_cfn.describe_stacks(StackName=stack_name)
+        if cfn_resp:
+            stack_output = cfn_resp['Stacks'][0]['Outputs']
+            if stack_output:
+                output = list(filter(lambda o: o['OutputKey']
+                                     == output_key, stack_output))
+                if output[0]['OutputValue']:
+                    value = output[0]['OutputValue']
+
+        if value:
+            print(value)
+        else:
+            exit(1)
+    except Exception as err:
+        print("get_output_from_stack.failed: ", err)
+        exit(1)
+

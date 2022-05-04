@@ -1,0 +1,60 @@
+// athena/tagging/ath-be-tag-release-version
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'build_version', description: 'Build Version of Image. Ex: BE-1.0.0-1')
+    string(name: 'release_version', description: "The Release Version Tag that QC/QA wants to add into Image. Notes: Tag shouldn't have space. Ex: 1.0.0 ")
+  }
+
+  environment {
+    profile = 'prod'
+    prod_account_id = '690893158275'
+    region = 'us-east-2'
+    image_id = sh(script: '/usr/local/bin/get_ami_from_build_version ${build_version}', returnStdout: true).trim()
+  }
+
+  stages {
+    stage('Tag Image') {
+      steps {
+        echo "=> Tag BE Release Version"
+        sh '/usr/local/bin/tag_be_release_version $image_id $release_version'
+      }
+    }
+    stage('Share AMI to Main AWS Account') {
+      steps {
+        dir('/usr/local/bin') {
+          echo "=> Share Release Version to Main Account"
+          sh '/usr/bin/python3 AwsAmi.py share --image_id=${image_id} --account_id=${prod_account_id}'
+          echo "=> Tag Release Version Image in Main Account"
+          sh '/usr/bin/python3 AwsAmi.py tag --image_id=${image_id} --region=${region} --profile=${prod}'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '==> Clean up built after run'
+      cleanWS()
+    }
+    success {
+      echo "Tag success for ReleaseVersion: ${params.release_version}"
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Send Success Message to Hangout"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuildVersion: ${params.build_version}\nReleaseVersion: ${params.release_version}\nDuration: ${DURATION}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      echo "Tag failed for ReleaseVersion: ${params.release_version}"
+      script {
+        env.DURATION = currentBuild.durationString.split(' and ')[0]
+      }
+      echo "==> Send Failure Message to Hangout"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuildVersion: ${params.build_version}\nReleaseVersion: ${params.release_version}\nDuration: ${DURATION}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

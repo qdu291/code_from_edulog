@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+from fire import Fire
+import boto3
+from botocore.config import Config
+import json
+
+def connect(service: str = 'ec2', profile: str = 'default', region: str = 'us-east-2'):
+  try:
+    config = Config(region_name=region)
+    session = boto3.Session(profile_name=profile)
+
+    return session.client(service, config=config)
+  except Exception as err:
+    print('connect.error', err)
+    raise err
+
+def getIp(EC2, inst_id: str):
+  """Get Private IP Address of Instance in an ASG
+
+  Args:
+      asgName (str): AWS AutoScaling Group Name
+  """
+  private_ip = ''
+  inst = EC2.describe_instances(InstanceIds=[inst_id])
+  if inst:
+    instance = inst['Reservations'][0]['Instances'][0]
+    if instance:
+      private_ip = instance['PrivateIpAddress']
+  return private_ip
+
+def collectASGInfo(sitesList: list, totalSites: int, ASG, EC2, token: str, asgType: str = 'BEASGStack'):
+  if token:
+    resp = ASG.describe_auto_scaling_groups(NextToken=token)
+  else:
+    resp = ASG.describe_auto_scaling_groups()
+  if resp:
+    asgs = resp.get('AutoScalingGroups')
+    if asgs and len(asgs) > 0:
+      for a in asgs:
+        name = a.get('AutoScalingGroupName')
+        nameParts = name.split('-')
+        if len(nameParts) > 4:
+          if nameParts[0] == 'athena' and nameParts[-4] == asgType:
+            # Get site name by removing un-used part in nameParts
+            nameParts.pop(0)
+            for i in range(4):
+              nameParts.pop()
+            site = '-'.join(nameParts)
+            sitesList.append(site)
+                        
+            totalSites += 1
+    nextToken = resp.get('NextToken')
+    if nextToken:
+      return collectASGInfo(sitesList, totalSites, ASG, EC2, nextToken, asgType)
+  return sitesList, totalSites, nextToken
+
+def listSites(ASG, EC2):
+  sitesList = []
+  totalSites = 0
+  asgType = 'BEASGStack'
+  try:
+    sitesList, totalSites, token = collectASGInfo(sitesList, totalSites, ASG, EC2, '', asgType)
+
+    print('total', totalSites)
+    return sitesList
+  except Exception as err:
+    print('athena-site.listSites.error', err)
+    raise err
+
+def getInfo(CFN, siteName: str):
+  return 'get info of a site'
+
+def handler(action: str, envType: str = 'nonprod', region: str = 'us-east-2', siteName: str = ''):
+  ACTIONS = ['list', 'info']
+  if action not in ACTIONS:
+    raise Exception('athena-site.error: Action {} is unsupported!!!'.format(action))
+  SUPPORTED_ENVTYPES = ['nonprod', 'prod']
+  if envType not in SUPPORTED_ENVTYPES:
+    raise Exception('athena-site.error: envType {} is unsupported!!!'.format(envType))
+
+
+  ASG = connect(service='autoscaling', region=region)
+  EC2 = connect(service='ec2', region=region)
+  CFN = connect(service='cloudformation', region=region)
+  if envType == 'prod':
+    ASG = connect('autoscaling', 'prod', region)
+    EC2 = connect('ec2', 'prod', region)
+    CFN = connect('cloudformation', 'prod', region)
+
+  try:
+
+    if action == 'list':
+      return listSites(ASG, EC2)
+    if action == 'info':
+      return getInfo(CFN, siteName)
+
+  except Exception as err:
+    print('athena-site.error', err)
+    raise err
+
+
+if __name__ == '__main__':
+  Fire(handler)

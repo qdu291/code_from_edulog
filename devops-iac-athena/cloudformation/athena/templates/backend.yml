@@ -1,0 +1,372 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena Backend Template
+Parameters:
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+  Env:
+    Description: Environment that we want to deploy Athena Project
+    Type: String
+    AllowedValues:
+      - "nonprod"
+      - "prod"
+  TenantId:
+    Description: Tenant ID that we want to deploy Athena Project
+    Type: String
+    Default: ""
+  KarrosGateway:
+    Description: URL of KarrosGateway Endpoint for Authentication
+    Type: String
+    Default: athenagateway-p01-demo.usw2.karrostech.net
+  KeycloakDomain:
+    Description: Karros Login with KeyCloak Domain
+    Type: String
+  KeycloakId:
+    Description: Karros Login with KeyCloak Client Id
+    Type: String
+  KeycloakBEId:
+    Description: Karros Login with KeyCloak Client Backend Id
+    Type: String
+  KeycloakSecret:
+    Description: Karros Login with KeyCloak Client Secret
+    Type: String
+  KeyPairName:
+    Description: Instance KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+  BackendAMIId:
+    Description: "Backend Base/Release AMI"
+    Type: AWS::EC2::Image::Id
+  BackendInstanceType:
+    Description: "Backend Instance Type"
+    Type: String
+    AllowedValues:
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+    ConstraintDescription: Choose an instance type.
+  BEASGMinSize:
+    Description: "Minimum No of Backend instances"
+    Type: Number
+  BEASGMaxSize:
+    Description: "Maximum No of Backend instances"
+    Type: Number
+  BEASGDesiredCapacity:
+    Description: "Desired No of Backend instances"
+    Type: Number
+  BESSLCertificateId:
+    Description: "The ARN of the SSL certificate to use for the Backend ALB"
+    Type: String
+  BEDBUser:
+    Description: "PostgreSQL User that Backend uses to connect"
+    Type: String
+  BEDBPassword:
+    Description: "PostgreSQL User Password that Backend uses to connect"
+    Type: String
+    NoEcho: "True"
+  BEDomain:
+    Description: Backend Root Domain which hosted in Route53
+    Type: String
+  BEHostedZoneId:
+    Description: Route53 Hosted Zone for Backend
+    Type: String
+  BESecurityGroup:
+    Description: Backend Instance Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  BEALBSecurityGroup:
+    Description: Backend ALB Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  ManagementSecurityGroup:
+    Description: AWS SSM Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnet1ID:
+    Description: The ID of the 1st private subnet.
+    Type: AWS::EC2::Subnet::Id
+  Subnet2ID:
+    Description: The ID of the 2nd private subnet.
+    Type: AWS::EC2::Subnet::Id
+  PublicSubnet1ID:
+    Description: The ID of the 1st public subnet.
+    Type: AWS::EC2::Subnet::Id
+  PublicSubnet2ID:
+    Description: The ID of the 2nd public subnet.
+    Type: AWS::EC2::Subnet::Id
+  VPCID:
+    Description: ID of the VPC you are deploying into (e.g., vpc-0343606e).
+    Type: AWS::EC2::VPC::Id
+  PublicALBTargetGroupWS:
+    Description: This is PublicALBTargetGroupWS of Cache-Queue Instance. Should be get from CacheQueueStack
+    Type: String
+  RDSEndpoint:
+    Description: RDS PostgreSQL Endpoint
+    Type: String
+  CacheUser:
+    Description: "MongoDB User for Backend"
+    Type: String
+  CachePassword:
+    Description: "MongoDB User Password for Backend"
+    Type: String
+    NoEcho: "True"
+  QueueUser:
+    Description: "RabbitMQ User for Backend"
+    Type: String
+  QueuePassword:
+    Description: "RabbitMQ User Password for Backend"
+    Type: String
+    NoEcho: "True"
+  KafkaBrokers:
+    Description: List of Kafka Brokers (MSK)
+    Type: String
+  ZookeeperBrokers:
+    Description: List of ZooKeepers (MSK)
+    Type: String
+  WOSNOSHost:
+    Type: String
+    Description: "WOSNOS Instance Private IP Address"
+  DebeziumControllerAPI:
+    Type: String
+    Description: "Debezium Controller API for Controlling Debezium Connectors"
+  DebeziumControllerKey:
+    Type: String
+    Description: "Debezium Controller Key for Controlling Debezium Connectors"
+Resources:
+  PublicALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "600"
+      Subnets:
+        - !Ref PublicSubnet1ID
+        - !Ref PublicSubnet2ID
+      SecurityGroups:
+        - !Ref BEALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-publicalb
+  PublicALBTargetGroupHTTP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPCID
+  PublicALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref BESSLCertificateId
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref PublicALBTargetGroupHTTP
+      LoadBalancerArn: !Ref PublicALB
+      Port: 443
+      Protocol: HTTPS
+  WSListenerRule:
+    Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref PublicALBTargetGroupWS
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - "/ws"
+      ListenerArn: !Ref PublicALBListenerHTTPS
+      Priority: 2
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-launchtemplate
+      LaunchTemplateData:
+        InstanceType: !Ref BackendInstanceType
+        ImageId: !Ref BackendAMIId
+        IamInstanceProfile:
+          Arn: !GetAtt InstanceProfile.Arn
+        KeyName: !Ref KeyPairName
+        SecurityGroupIds:
+          - !Ref BESecurityGroup
+          - !Ref ManagementSecurityGroup
+        UserData: !Base64
+          Fn::Sub: |
+            #!/bin/bash
+            ## Enable CloudWatch Agent
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:AmazonCloudWatch-athena-${Env}-${Tenant}
+
+            ## Add environment Variables
+            echo "ENV=${Env}" > /opt/athena/env/athena.env
+            echo "TENANT=${Tenant}" >> /opt/athena/env/athena.env
+            echo "TENANT_ID=${TenantId}" >> /opt/athena/env/athena.env
+            echo "KARROS_GATEWAY=${KarrosGateway}" >> /opt/athena/env/athena.env
+            echo "KEYCLOAK_DOMAIN=${KeycloakDomain}" >> /opt/athena/env/athena.env
+            echo "KEYCLOAK_ID=${KeycloakId}" >> /opt/athena/env/athena.env
+            echo "KEYCLOAK_BACKEND_ID=${KeycloakBEId}" >> /opt/athena/env/athena.env
+            echo "KEYCLOAK_SECRET=${KeycloakSecret}" >> /opt/athena/env/athena.env
+            echo "CACHE_HOST=cq-${Tenant}.${BEDomain}" >> /opt/athena/env/athena.env
+            echo "QUEUE_HOST=cq-${Tenant}.${BEDomain}" >> /opt/athena/env/athena.env
+            echo "QUEUE_USER=${QueueUser}" >> /opt/athena/env/athena.env
+            echo "QUEUE_PASS=${QueuePassword}" >> /opt/athena/env/athena.env
+            echo "DB_HOST=${RDSEndpoint}" >> /opt/athena/env/athena.env
+            echo "DB_USER=${BEDBUser}" >> /opt/athena/env/athena.env
+            echo "DB_PASS=${BEDBPassword}" >> /opt/athena/env/athena.env
+            echo "DB_NAME=Athena" >> /opt/athena/env/athena.env
+            echo "KAFKA_CONSUMER=${KafkaBrokers}" >> /opt/athena/env/athena.env
+            echo "KAFKA_PRODUCER=${KafkaBrokers}" >> /opt/athena/env/athena.env
+            echo "ATHENA_KAFKA_PRODUCERS=${KafkaBrokers}" >> /opt/athena/env/athena.env
+            echo "ATHENA_KAFKA_CONSUMERS=${KafkaBrokers}" >> /opt/athena/env/athena.env
+            echo "DEBEZIUM_CONTROLLER_API=${DebeziumControllerAPI}" >> /opt/athena/env/athena.env
+            echo "DEBEZIUM_CONTROLLER_KEY=${DebeziumControllerKey}" >> /opt/athena/env/athena.env
+            echo "NOS_HOST=${WOSNOSHost}" >> /opt/athena/env/athena.env
+            echo "ES_URL=athena-snapshot-${Env}.es.us-east-2.aws.elastic-cloud.com" >> /opt/athena/env/athena.env
+            echo "ES_USERNAME=athena" >> /opt/athena/env/athena.env
+            echo "ES_PASSWORD=thr0ug40utr0tg1v3nl3g" >> /opt/athena/env/athena.env
+            echo "ES_PORT=9243" >> /opt/athena/env/athena.env
+            echo "ES_RUN_INDEX=snapshot_run" >> /opt/athena/env/athena.env
+            echo "ES_TRIP_INDEX=snapshot_trip" >> /opt/athena/env/athena.env
+            echo "ES_ROUTE_INDEX=snapshot_route" >> /opt/athena/env/athena.env
+            echo "ES_SNAPSHOT_ENABLED=true" >> /opt/athena/env/athena.env
+            echo "ES_SNAPSHOT_SUPRESS_WRITE_ERRORS=true" >> /opt/athena/env/athena.env
+            echo "ES_SNAPSHOT_ROUTING_WRITE_ENABLED=true" >> /opt/athena/env/athena.env
+            echo "ES_PROTOCOL=https" >> /opt/athena/env/athena.env
+            echo "ES_CONNECTIONTIMEOUT=10000" >> /opt/athena/env/athena.env
+            echo "ES_SOCKETTIMEOUT=60000" >> /opt/athena/env/athena.env
+            echo "ES_PARALELLESTHREADCOUNT=100" >> /opt/athena/env/athena.env
+            echo "STUDENT_CHANGE_EXCEPTION_FLOW_FIELDS=firstName,lastName" >> /opt/athena/env/athena.env
+
+            ## Run DB Migration
+            . /opt/athena/env/athena.env
+            sudo java -Ddb.server=$DB_HOST -Ddb.name=Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m /opt/athena/src/RoutingMigration.jar
+
+            ## Clean GeoServer data
+            /bin/rm -rf /opt/athena/data/geoserver/workspaces/*
+            /usr/bin/docker restart geoserver
+
+            ## Apply variables to services
+            systemctl restart gateway
+            systemctl restart middle
+            systemctl restart backend
+            systemctl restart importservice
+            systemctl restart geocodeservice
+            systemctl restart plannedrollover
+            systemctl restart reportsserver
+            systemctl restart overlay
+            systemctl restart command-distributor
+            systemctl restart aggregateservice
+            systemctl restart rres
+            systemctl restart ivin
+            systemctl restart timeattendance
+            systemctl restart specialneeds
+            sleep 10
+        Monitoring:
+          Enabled: true
+  AutoScaling:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: !Ref BEASGMinSize
+      MaxSize: !Ref BEASGMaxSize
+      DesiredCapacity: !Ref BEASGDesiredCapacity
+      TargetGroupARNs:
+        - !Ref PublicALBTargetGroupHTTP
+      VPCZoneIdentifier:
+        - !Ref Subnet1ID
+        - !Ref Subnet2ID
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-instance
+          PropagateAtLaunch: true
+        - Key: project
+          Value: athena
+          PropagateAtLaunch: true
+        - Key: author
+          Value: ktvn-devops
+          PropagateAtLaunch: true
+        - Key: environment
+          Value: !Ref Tenant
+          PropagateAtLaunch: true
+        - Key: type
+          Value: backend
+          PropagateAtLaunch: true
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: "1"
+        MaxBatchSize: "1"
+        PauseTime: "PT2M5S"
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
+        # WaitOnResourceSignals: Boolean
+  CPUTargetTrackingScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScaling
+      Cooldown: "60"
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 80.0
+
+  BERoute53Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref BEHostedZoneId
+      Name: !Sub ath-be-${Tenant}.${BEDomain}
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt PublicALB.CanonicalHostedZoneID
+        DNSName: !GetAtt PublicALB.DNSName
+Outputs:
+  PublicALBURL:
+    Description:
+      The URL of the Public ALB, you should create a CNAME or alias to this name
+      if you specified a DNS name
+    Value: !Sub https://${PublicALB.DNSName}
+  BEURL:
+    Description: Backend URL for Frontend to call
+    Value: !Sub https://${BERoute53Record}
+  BEHostName:
+    Description: Backend Host Name for Frontend to configure
+    Value: !Ref BERoute53Record
+  BEASGName:
+    Description: Backend AutoScaling Group Name
+    Value: !Ref AutoScaling

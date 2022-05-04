@@ -1,0 +1,76 @@
+// Job Name: ath-be-image-build
+pipeline {
+  agent any
+
+  parameters {
+    choice(
+      name: 'SERVICE_NAME', 
+      choices: ['gateway', 'TransactionHUBV2', 'RoutingServer', 'GeoCodeService', 'RoutingMigration', 'DriverTimeAndAttendance', 'IVIN', 'PlannedRollover', 'services'], 
+      description: 'The Service Build that trigger this job.')
+    string(name: 'BUILD_VERSION', defaultValue: '', description: 'Build Version of Service which is in format {POM_VERSION}.{BUILD_NUMBER}.{GIT_COMMIT}')
+  }
+
+  environment {
+    IMAGE_BUILD_VERSION = "BE-1.0.0-${BUILD_NUMBER}"
+  }
+
+  stages {
+    stage('Deploy services') {
+      when {
+        equals expected: 'services', actual: params.SERVICE_NAME
+      }
+      steps {
+        sh '''#!/bin/bash -xe
+          ssh -t stage_instance "/usr/local/bin/deploy-services ${BUILD_VERSION}"
+        '''
+      }
+    }
+    stage('Deploy service') {
+      when {
+        not {
+          equals expected: 'services', actual: params.SERVICE_NAME
+        }
+      }
+      steps {
+        echo "==> Deploy service ${params.SERVICE_NAME} to Stage"
+        sh '''#!/bin/bash -xe
+          ssh -t stage_instance "/usr/local/bin/deploy-service ${SERVICE_NAME} ${BUILD_VERSION}"
+        '''
+        echo "==> Apply service to Stage"
+        sh '''#!/bin/bash -xe
+          ssh -t stage_instance "/usr/local/bin/apply-service ${SERVICE_NAME}"
+        '''
+      }
+    }
+    stage('Get Service Versions') {
+      steps {
+        echo "==> Get versions of all services"
+        script {
+          env.SERVICE_VERSIONS = sh(script: "ssh -t stage_instance '/usr/local/bin/get-service-versions'", returnStdout: true).trim()
+        }
+      }
+    }
+    stage('Create Image') {
+      steps {
+        echo "==> Create AWS AMI"
+        echo "==> Versioning Services in AMI: ${env.SERVICE_VERSIONS}"
+        script {
+          env.IMAGE_ID = sh(script: "create-ami ${ATH_STAGE_BASE_INSTANCE_ID} ${SERVICE_NAME} ${IMAGE_BUILD_VERSION} ${SERVICE_VERSIONS}", returnStdout: true).trim()
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${IMAGE_BUILD_VERSION}\nImage-Id: ${IMAGE_ID}\nService-Build: ${SERVICE_NAME}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+    failure {
+      echo "==> Notify to Google Chat Room"
+      hangoutsNotify message: "Status: *${currentBuild.result}*\nBuild-Version: ${IMAGE_BUILD_VERSION}\nImage-Id: ${IMAGE_ID}\nService-Build: ${SERVICE_NAME}\nDuration: ${currentBuild.durationString}",
+        token: "${ATH_GOOGLE_CHAT_TOKEN}", threadByJob: true
+    }
+  }
+}

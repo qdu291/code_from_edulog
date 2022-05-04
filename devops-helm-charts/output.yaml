@@ -1,0 +1,1625 @@
+---
+# Source: athena/charts/aggregateservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: aggregateservice
+  labels:
+    svc: aggregateservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8085
+      targetPort: 8085
+      protocol: TCP
+      name: http
+  selector:
+    app: aggregateservice
+---
+# Source: athena/charts/edtaservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: edtaservice
+  labels:
+    svc: edtaservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8083
+      targetPort: 8083
+      protocol: TCP
+      name: http
+  selector:
+    app: edtaservice
+---
+# Source: athena/charts/gateway/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: gateway
+  labels:
+    svc: gateway
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:696952606624:certificate/99a317f8-79c9-476c-b2cd-7882c1640778
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    dns.alpha.kubernetes.io/external:
+      ath-be-default.athena-nonprod.com
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 443
+      targetPort: 80
+      protocol: TCP
+      name: https
+  selector:
+    app: gateway
+---
+# Source: athena/charts/geocalculationservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: geocalculationservice
+  labels:
+    svc: geocalculationservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8077
+      targetPort: 8077
+      protocol: TCP
+      name: http
+  selector:
+    app: geocalculationservice
+---
+# Source: athena/charts/geocodeservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: geocodeservice
+  labels:
+    svc: geocodeservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8095
+      targetPort: 8095
+      protocol: TCP
+      name: http
+  selector:
+    app: geocodeservice
+---
+# Source: athena/charts/geoserverservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: geoserverservice
+  labels:
+    svc: geoserverservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8070
+      targetPort: 8070
+      protocol: TCP
+      name: http
+  selector:
+    app: geoserverservice
+---
+# Source: athena/charts/importingservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: importingservice
+  labels:
+    svc: importingservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8097
+      targetPort: 8097
+      protocol: TCP
+      name: http
+  selector:
+    app: importingservice
+---
+# Source: athena/charts/ivinservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: ivinservice
+  labels:
+    svc: ivinservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8086
+      targetPort: 8086
+      protocol: TCP
+      name: http
+  selector:
+    app: ivinservice
+---
+# Source: athena/charts/overlayservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: overlayservice
+  labels:
+    svc: overlayservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8095
+      targetPort: 8095
+      protocol: TCP
+      name: http
+  selector:
+    app: overlayservice
+---
+# Source: athena/charts/plannedrolloverservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: plannedrolloverservice
+  labels:
+    svc: plannedrolloverservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8100
+      targetPort: 8100
+      protocol: TCP
+      name: http
+  selector:
+    app: plannedrolloverservice
+---
+# Source: athena/charts/reportservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: reportservice
+  labels:
+    svc: reportservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8084
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: reportservice
+---
+# Source: athena/charts/routingmigration/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: routingmigration
+  labels:
+    svc: routingmigration
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8086
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: routingmigration
+---
+# Source: athena/charts/routingservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: routingservice
+  labels:
+    svc: routingservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: routingservice
+---
+# Source: athena/charts/rresservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: rresservice
+  labels:
+    svc: rresservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8077
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rresservice
+---
+# Source: athena/charts/specialneeds/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: specialneeds
+  labels:
+    svc: specialneeds
+spec:
+  ports:
+    - port: 8078
+      protocol: TCP
+      name: http
+  selector:
+    app: specialneeds
+---
+# Source: athena/charts/tnxhubservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: tnxhubservice
+  labels:
+    svc: tnxhubservice
+spec:
+  # type: ClusterIP
+  ports:
+    - port: 8090
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: tnxhubservice
+---
+# Source: athena/charts/aggregateservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: aggregateservice
+  labels:
+    name: aggregateservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aggregateservice
+  template:
+    metadata:
+      labels:
+        name: aggregateservice
+        app: aggregateservice
+    spec:
+      containers:
+        - name: aggregateservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/aggregateservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env && java -Dspring.profiles.active=eks -Dspring.kafka.consumer.topics=stage-athena-run-changes,stage-athena-route-changes -Dspring.kafka.consumer.group-id=${CLIENT_ID}-aggregator -Dspring.kafka.consumer.concurrency=12 -Dspring.kafka.consumer.bootstrap-servers=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092 -Dspring.kafka.producer.bootstrap-servers=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092 -Dtenant.id=${TENANT_ID} -Dapp.name=aggregator_run -Dtenant.name=${CLIENT_ID} -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8085
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/edtaservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: edtaservice
+  labels:
+    name: edtaservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edtaservice
+  template:
+    metadata:
+      labels:
+        name: edtaservice
+        app: edtaservice
+    spec:
+      containers:
+        - name: edtaservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/timeattendance:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dspring.profiles.active=eks -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/gateway/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: gateway
+  labels:
+    name: gateway
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        name: gateway
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/gateway:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dcom.sun.management.jmxremote.port=6001 -Dspring.profiles.active=eks -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=6001 -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 443
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 443
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 443
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/geocalculationservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: geocalculationservice
+  labels:
+    name: geocalculationservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geocalculationservice
+  template:
+    metadata:
+      labels:
+        name: geocalculationservice
+        app: geocalculationservice
+    spec:
+      containers:
+        - name: geocalculationservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/geocalculation:latest"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dspring.profiles.active=eks -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar --nos.server=${NOS_HOST} --nos.port=${NOS_PORT}
+          ports:
+            - name: http
+              containerPort: 8077
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8077
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8077
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/geocodeservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: geocodeservice
+  labels:
+    name: geocodeservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geocodeservice
+  template:
+    metadata:
+      labels:
+        name: geocodeservice
+        app: geocodeservice
+    spec:
+      containers:
+        - name: geocodeservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/geocodeservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env && java -Dcom.sun.management.jmxremote.port=6001 -Dspring.profiles.active=eks -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=6001 -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena
+          ports:
+            - name: http
+              containerPort: 8095
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 500m
+              memory: "1024Mi"
+            limits:
+              cpu: 1
+              memory: "2048Mi"
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/importingservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: importingservice
+  labels:
+    name: importingservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: importingservice
+  template:
+    metadata:
+      labels:
+        name: importingservice
+        app: importingservice
+    spec:
+      containers:
+        - name: importingservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/importservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dcom.sun.management.jmxremote.port=6001 -Dspring.profiles.active=eks -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=6001 -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena
+          ports:
+            - name: http
+              containerPort: 8097
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8097
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8097
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/ivinservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: ivinservice
+  labels:
+    name: ivinservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ivinservice
+  template:
+    metadata:
+      labels:
+        name: ivinservice
+        app: ivinservice
+    spec:
+      containers:
+        - name: ivinservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/ivin:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dserver.tomcat.mbeanregistry.enabled=true -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8086
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8086
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8086
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/overlayservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: overlayservice
+  labels:
+    name: overlayservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: overlayservice
+  template:
+    metadata:
+      labels:
+        name: overlayservice
+        app: overlayservice
+    spec:
+      containers:
+        - name: overlayservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/overlay:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env && java -Dspring.profiles.active=eks -jar -XX:+UseG1GC -Xms256m -Xmx1024m  /home/athena/app.jar --overlay.database.server=${DB_HOST} --geocode.database.server=${DB_HOST}
+          ports:
+            - name: http
+              containerPort: 8095
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8095
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8095
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/plannedrolloverservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: plannedrolloverservice
+  labels:
+    name: plannedrolloverservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plannedrolloverservice
+  template:
+    metadata:
+      labels:
+        name: plannedrolloverservice
+        app: plannedrolloverservice
+    spec:
+      containers:
+        - name: plannedrolloverservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/plannedrolloverservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dcom.sun.management.jmxremote.port=6001 -Dspring.profiles.active=eks -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=6001 -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena
+          ports:
+            - name: http
+              containerPort: 8100
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8100
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8100
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/reportservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: reportservice
+  labels:
+    name: reportservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reportservice
+  template:
+    metadata:
+      labels:
+        name: reportservice
+        app: reportservice
+    spec:
+      containers:
+        - name: reportservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/reportservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dcom.sun.management.jmxremote.port=6001 -Dspring.profiles.active=eks -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=6001 -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar --spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena
+          ports:
+            - name: http
+              containerPort: 8084
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/routingmigration/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: routingmigration
+  labels:
+    name: routingmigration
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: routingmigration
+  template:
+    metadata:
+      labels:
+        name: routingmigration
+        app: routingmigration
+    spec:
+      containers:
+        - name: routingmigration
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/routingmigration:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dcom.sun.management.jmxremote.port=6001 -Dspring.profiles.active=eks -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=6001 -jar -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8086
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8086
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8086
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/routingservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: routingservice
+  labels:
+    name: routingservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: routingservice
+  template:
+    metadata:
+      labels:
+        name: routingservice
+        app: routingservice
+    spec:
+      containers:
+        - name: routingservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/routingservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -Dspring.profiles.active=eks -Dspring.rabbitmq.host=${QUEUE_HOST} -Dspring.rabbitmq.username=${QUEUE_USER} -Dspring.rabbitmq.password=${QUEUE_PASS} -Dspring.data.mongodb.host=${CACHE_HOST} -Dathena.env.name=stage -Dathena.tenant.id=${TENANT_ID} -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/rresservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: rresservice
+  labels:
+    name: rresservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rresservice
+  template:
+    metadata:
+      labels:
+        name: rresservice
+        app: rresservice
+    spec:
+      containers:
+        - name: rresservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/rres:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -jar -Dspring.profiles.active=eks -XX:+UseG1GC -Xms256m -Xmx1024m /home/athena/app.jar  --kafka.bootstrap-servers=${ATHENA_KAFKA_CONSUMERS}  --kafka.consumer.topics=${TENANT_ID}-rideRegistrationChange  --mongo.url=mongodb://${CACHE_HOST}:27017/?uuidRepresentation=STANDARD  --application.athena.tenant.id=${TENANT_ID}  --application.karros.login.url=https://${KARROS_GATEWAY}/api/v1/signin  --application.karros.keycloak.client-id=${KEYCLOAK_ID}  --application.karros.keycloak.client-secret=${KEYCLOAK_SECRET}  --application.karros.keycloak.url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/token  --application.karros.keycloak.logout-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/logout  --application.karros.keycloak.forgot-password-url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/karros-auth/forgot-password
+          ports:
+            - name: http
+              containerPort: 8077
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8077
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8077
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/specialneeds/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: specialneeds
+  labels:
+    name: specialneeds
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: specialneeds
+  template:
+    metadata:
+      labels:
+        name: specialneeds
+        app: specialneeds
+    spec:
+      containers:
+        - name: specialneeds
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/specialneeds:latest"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env;java -Dspring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/Athena -Dspring.profiles.active=eks -Dspring.rabbitmq.host=${QUEUE_HOST} -Dspring.rabbitmq.username=${QUEUE_USER} -Dspring.rabbitmq.password=${QUEUE_PASS} -Dspring.data.mongodb.host=${CACHE_HOST} -Dathena.env.name=stage -Dathena.tenant.id=${TENANT_ID} -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8078
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8078
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8078
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/tnxhubservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: tnxhubservice
+  labels:
+    name: tnxhubservice
+  annotations:
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tnxhubservice
+  template:
+    metadata:
+      labels:
+        name: tnxhubservice
+        app: tnxhubservice
+    spec:
+      containers:
+        - name: tnxhubservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/tnxhubservice:1.19.0"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - . /home/athena/athena.env && java -Dtransactionhub.mongodb.host=${CACHE_HOST} -Duser.mongodb.host=${CACHE_HOST} -Dspring.rabbitmq.host=${QUEUE_HOST} -Dspring.rabbitmq.username=${QUEUE_USER} -Dspring.rabbitmq.password=${QUEUE_PASS} -Dspring.profiles.active=eks -Dathena.env.name=stage -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          volumeMounts:
+          - mountPath: /home/athena/athena.env
+            name: athenaenv
+            subPath: athena.env
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8090
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8090
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always
+---
+# Source: athena/charts/aggregateservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: aggregateservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aggregateservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/edtaservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: edtaservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: edtaservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/gateway/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/geocalculationservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: geocalculationservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: geocalculationservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/geocodeservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: geocodeservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: geocodeservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/importingservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: importingservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: importingservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/ivinservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: ivinservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ivinservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/overlayservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: overlayservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: overlayservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/plannedrolloverservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: plannedrolloverservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: plannedrolloverservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/reportservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: reportservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: reportservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/routingservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: routingservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: routingservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/rresservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: rresservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rresservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/specialneeds/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: specialneeds
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: specialneeds
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/tnxhubservice/templates/hpa.yaml
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  namespace: default
+  name: tnxhubservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tnxhubservice
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metricName: jvm_threads_live_threads
+      targetAverageValue: 2500
+  - type: Pods
+    pods:
+      metricName: tomcat_threads_current_threads
+      targetAverageValue: 50
+---
+# Source: athena/charts/geoserverservice/templates/stafulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: default
+  name: geoserverservice
+spec:
+  selector:
+    matchLabels:
+      app: geoserverservice
+  serviceName: geoserverservice
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: geoserverservice
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: geoserverservice
+          image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/geoserver:latest"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: geoserverservice
+              mountPath: /_data
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          resources:
+            requests:
+              cpu: 200m
+              memory: "1024Mi"
+            limits:
+              cpu: 500m
+              memory: "2048Mi"
+  # volumeClaimTemplates:
+  # - metadata:
+  #     name: geoserverservice
+  #     annotations:
+  #       volume.beta.kubernetes.io/storage-class: "gp2"
+  #   spec:
+  #     accessModes: [ "ReadWriteOnce" ]
+  #     resources:
+  #       requests:
+  #         storage: 10Gi
+---
+# Source: athena/charts/routingmigration/templates/cronjob.yaml
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  namespace: default
+  name: routingmigration
+  labels:
+    name: routingmigration
+spec:
+  schedule: "1 1 * 1 *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: routingmigration
+            image: "696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/routingmigration:1.19.0"
+            imagePullPolicy: Always
+            volumeMounts:
+            - mountPath: /home/athena/athena.env
+              name: athenaenv
+              subPath: athena.env
+            command: 
+            - "/bin/sh"
+            - "-c"
+            args: 
+              - . /home/athena/athena.env;java -Ddb.server=${DB_HOST} -Ddb.name=Athena -jar -XX:+UseG1GC -Xms256m -Xmx1536m /home/athena/app.jar
+          volumes:
+            - name: athenaenv
+              configMap:
+                defaultMode: 420
+                name: athenaenv
+          restartPolicy: Never
+---
+# Source: athena/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: RELEASE-NAME
+  name: athenaenv
+  annotations:
+    "helm.sh/hook": "pre-install"
+    "helm.sh/hook-weight": "0"
+data:
+  athena.env: >
+    ENV=nonprod
+
+    TENANT=testing-01-eks
+
+    TENANT_ID=0462c4ce-c294-4cfc-9225-219dcb5256b1
+
+    KARROS_GATEWAY=athenagateway-p01-demo.usw1.karrostech.net
+
+    KEYCLOAK_DOMAIN=aaa-demo.usw2.karrostech.net
+
+    DB_HOST=athena-testing-01-eks-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com
+
+    DB_NAME=Athena
+
+    KAFKA_CONSUMERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+
+    KAFKA_PRODUCERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+
+    DEBEZIUM_CONTROLLER_API=httpps://zzciu1ond8.execute-api.us-east-2.amazonaws.com/default/debezium-controller
+
+    DEBEZIUM_CONTROLLER_KEY=Y4BwX5q58bfcfeaig7iR6u1CBINwb6dA5gY7rc70
+
+    NOS_HOST=10.11.5.15
+
+    KEYCLOAK_ID=athena
+
+    KEYCLOAK_BACKEND_ID=athena-backend
+
+    KEYCLOAK_SECRET=4fc89ec7-3af8-4649-a014-529ef2975805
+
+    CACHE_HOST=mongo
+
+    QUEUE_HOST=rabbitmq
+
+    QUEUE_USER=edulog
+
+    QUEUE_PASS=edul0g
+
+    DB_USER=edulog
+
+    DB_PASS=edul0g
+
+    ATHENA_KAFKA_PRODUCERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+
+    ATHENA_KAFKA_CONSUMERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+
+    GEOSERVER_HOST=geoserverservice
+
+    GEOSERVER_PORT=8070
+
+    NOS_HOST=10.11.5.15
+
+    NOS_PORT=8901

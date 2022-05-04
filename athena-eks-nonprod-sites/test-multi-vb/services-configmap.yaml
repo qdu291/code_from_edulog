@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: release
+data:
+  athena.env: |
+    ENV=nonprod
+    TENANT=test-multi-vb
+    TENANT_ID=3ee32912-dba0-4557-aff5-3c1191ddff41
+    KARROS_GATEWAY=athenagateway-p01-demo.usw2.karrostech.net
+    KEYCLOAK_DOMAIN=aaa-demo.usw2.karrostech.net
+    KEYCLOAK_ID=athena
+    KEYCLOAK_BACKEND_ID=athena-backend
+    KEYCLOAK_SECRET=4fc89ec7-3af8-4649-a014-529ef2975805
+    CACHE_HOST=mongo
+    QUEUE_HOST=rabbitmq
+    QUEUE_USER=edulog
+    QUEUE_PASS=edul0g
+    DB_HOST=athena-test-multi-vb-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com
+    DB_USER=edulog
+    DB_PASS=edul0g
+    DB_NAME=Athena
+    KAFKA_CONSUMER=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    KAFKA_PRODUCER=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    ATHENA_KAFKA_PRODUCERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    ATHENA_KAFKA_CONSUMERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    DEBEZIUM_CONTROLLER_API=https://zzciu1ond8.execute-api.us-east-2.amazonaws.com/default/debezium-controller
+    DEBEZIUM_CONTROLLER_KEY=Y4BwX5q58bfcfeaig7iR6u1CBINwb6dA5gY7rc70
+    NOS_HOST=10.11.62.195
+    NOS_PORT=8902
+    OPT_PORT=8802
+    ES_URL=athena-snapshot-nonprod.es.us-east-2.aws.elastic-cloud.com
+    ES_USERNAME=athena
+    ES_PASSWORD=thr0ug40utr0tg1v3nl3g
+    ES_PORT=9243
+    ES_RUN_INDEX=snapshot_run
+    ES_TRIP_INDEX=snapshot_trip
+    ES_ROUTE_INDEX=snapshot_route
+    ES_SNAPSHOT_ENABLED=true
+    ES_SNAPSHOT_SUPRESS_WRITE_ERRORS=true
+    ES_SNAPSHOT_ROUTING_WRITE_ENABLED=true
+    ES_PROTOCOL=https
+    ES_CONNECTIONTIMEOUT=10000
+    ES_SOCKETTIMEOUT=60000
+    ES_PARALELLESTHREADCOUNT=100
+    STUDENT_CHANGE_EXCEPTION_FLOW_FIELDS=firstName,lastName

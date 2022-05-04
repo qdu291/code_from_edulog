@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+import yaml
+import sys
+
+if __name__ == "__main__":
+  try:
+    site_name = sys.argv[1]
+    tenant_id = sys.argv[2]
+    db_host = sys.argv[3]
+    nos_host = sys.argv[4]
+    tag = sys.argv[5]
+
+    
+    be_services = ['aggregateservice', 'edtaservice', 'gateway', 'importingservice', 'ivinservice', 'overlayservice', 'routingservice', 'geocodeservice', 'plannedrolloverservice', 'reportservice', 'routingmigration', 'rresservice', 'tnxhubservice']
+    be_configuration = open('./beconfiguration.yaml').read()
+    contents = yaml.load(be_configuration, Loader=yaml.FullLoader)
+    
+    if len(sys.argv) == 7:
+      contents['tags'][sys.argv[6]] = True
+    elif len(sys.argv) == 8:
+      contents['tags'][sys.argv[6]] = True
+      contents['tags'][sys.argv[7]] = True
+    else:
+      contents['tags']['core'] = True
+      contents['tags']['rideRegistration'] = True
+      contents['tags']['mapOverlay'] = True
+
+    contents['configMap']['siteName'] = site_name
+    contents['configMap']['tenantId'] = tenant_id
+    contents['configMap']['dbHost'] = db_host
+    contents['configMap']['nosHost'] = nos_host
+
+    for service in be_services:
+      contents[service]['image']['tag'] = tag
+    print(yaml.dump(contents))
+    with open('./value.yaml', 'w') as file:
+      yaml.dump(contents,file)
+      file.close()
+  except Exception as e:
+    print(e)
+

@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: System Manager Documents
+Resources:
+  GrantUserAccessIntoEC2:
+    Type: AWS::SSM::Document
+    Properties:
+      DocumentType: Command
+      Content:
+        schemaVersion: "2.2"
+        description: "Run command to grant user access into EC2 instance"
+        parameters:
+          username:
+            type: String
+            description: "username to access"
+          role:
+            type: String
+            description: "role of user"
+            allowedValues:
+              - developer
+          publickey:
+            description: "public key of user"
+            type: String
+        mainSteps:
+          - precondition:
+              StringEquals:
+                - platformType
+                - Linux
+            action: aws:runShellScript
+            name: GrantUserAccessIntoEC2
+            inputs:
+              runCommand:
+                - "sudo useradd -m -s /bin/bash {{username}}"
+                - "sudo mkdir -p /home/{{username}}/.ssh"
+                - "sudo chmod 700 /home/{{username}}/.ssh"
+                - "sudo touch /home/{{username}}/.ssh/authorized_keys"
+                - "sudo chmod 600 /home/{{username}}/.ssh/authorized_keys"
+                - "sudo chown -R {{username}}: /home/{{username}}/.ssh"
+                - "echo {{publickey}} | sudo tee /home/{{username}}/.ssh/authorized_keys"
+                - "echo '{{username}}    ALL=(ALL)    NOPASSWD:ALL' | sudo tee -a /etc/sudoers.d/{{role}}"
+              timeoutSeconds: 3600
+  AthenaRunDBMigration:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: Athena-RunDBMigration
+      DocumentType: Command
+      Content:
+        schemaVersion: "2.2"
+        description: "Run command to execute DB Migration from Backend EC2 instance"
+        mainSteps:
+          - precondition:
+              StringEquals:
+                - platformType
+                - Linux
+            action: aws:runShellScript
+            name: RunDBMigrationService
+            inputs:
+              runCommand:
+                - ". /opt/athena/env/athena.env"
+                - "echo Run DB Migration"
+                - "sudo java -Ddb.server=$DB_HOST -Ddb.name=Athena -jar -XX:+UseG1GC -Xms256m -Xmx1024m /opt/athena/src/RoutingMigration.jar"
+              timeoutSeconds: 3600
+  AthenaManageService:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: Athena-ManageService
+      DocumentType: Command
+      Content:
+        schemaVersion: "2.2"
+        description: "Run command to manage Athena Service in EC2 Instance with systemctl"
+        parameters:
+          command:
+            type: String
+            description: "Command send to systemctl"
+            allowedValues:
+            - stop
+            - start
+            - restart
+            - status
+          serviceName:
+            type: String
+            description: "Athena Service Name"
+            allowedValues:
+            - gateway
+            - middle
+            - backend
+            - geocodeservice
+            - plannedrollover
+            - reportsserver
+            - ivin
+            - timeattendance
+            - aggregateservice
+            - importservice
+            - rres
+        mainSteps:
+          - precondition:
+              StringEquals:
+                - platformType
+                - Linux
+            action: aws:runShellScript
+            name: RunCommandOnService
+            inputs:
+              runCommand:
+                - "sudo systemctl {{command}} {{serviceName}}"
+              timeoutSeconds: 3600
+  AthenaManageAllServices:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: Athena-ManageAllServices
+      DocumentType: Command
+      Content:
+        schemaVersion: "2.2"
+        description: "Run command to manage all Athena Services in EC2 Instance with systemctl"
+        parameters:
+          command:
+            type: String
+            description: "Command send to systemctl"
+            allowedValues:
+            - stop
+            - start
+            - restart
+            - status
+        mainSteps:
+          - precondition:
+              StringEquals:
+                - platformType
+                - Linux
+            action: aws:runShellScript
+            name: RunCommandOnAllServices
+            inputs:
+              runCommand:
+                - "sudo systemctl {{command}} gateway"
+                - "sudo systemctl {{command}} middle"
+                - "sudo systemctl {{command}} backend"
+                - "sudo systemctl {{command}} geocodeservice"
+                - "sudo systemctl {{command}} plannedrollover"
+                - "sudo systemctl {{command}} reportsserver"
+                - "sudo systemctl {{command}} ivin"
+                - "sudo systemctl {{command}} timeattendance"
+                - "sudo systemctl {{command}} aggregateservice"
+                - "sudo systemctl {{command}} importservice"
+                - "sudo systemctl {{command}} rres"
+              timeoutSeconds: 3600

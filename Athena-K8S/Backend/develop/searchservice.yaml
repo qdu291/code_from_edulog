@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: develop-eks
+  name: searchservice
+  labels:
+    svc: searchservice
+spec:
+  selector:
+    app: searchservice
+  ports:
+  - protocol: TCP
+    port: 8075
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: develop-eks
+  name: searchservice
+  labels:
+    name: searchservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: searchservice
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: searchservice
+        app: searchservice
+    spec:
+      containers:
+      - image: 696952606624.dkr.ecr.us-east-2.amazonaws.com/athena/searchservice:develop-3080c50
+        name: searchservice
+        command: ["/bin/sh", "-c"]
+        args: 
+          - >
+            . /home/athena/athena.env && java
+            -Dsearch.elasticsearch.host=${ES_URL}
+            -jar -XX:+UseG1GC -Xms256m -Xmx512m /home/athena/app.jar
+        ports:
+        - name: http
+          containerPort: 8078
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /home/athena/athena.env
+          name: athenaenv
+          subPath: athena.env
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+      volumes:
+        - name: athenaenv
+          configMap:
+            defaultMode: 420
+            name: release
+      restartPolicy: Always

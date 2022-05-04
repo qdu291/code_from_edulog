@@ -1,0 +1,88 @@
+Description: MSK Cluster for Athena Environments
+Parameters:
+  Env:
+    Type: String
+    Default: Non-Prod
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  ClusterName:
+    Type: String
+    Default: AthenaMSK
+  ClientSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  MskInstanceType:
+    Type: String
+    Default: kafka.t3.small
+    AllowedValues: 
+      - kafka.t3.small
+      - kafka.m5.large
+      - kafka.m5.xlarge
+      - kafka.m5.2xlarge
+      - kafka.m5.4xlarge
+    Default: kafka.m5.large
+  NumberOfBrokerNodes:
+    Type: String
+    Default: 2
+  VolumeSize:
+    Type: String
+    Default: 100
+  MskConfigArn:
+    Type: String
+    Default: arn:aws:kafka:us-east-2:696952606624:configuration/athena-msk-config/578dc2eb-ceff-4ddb-830d-1a5c9db02dcd-3
+
+  # SecurityGroupId:
+  #   Type: AWS::EC2::SecurityGroup::Id
+
+Resources:
+  MskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecurityGroup for MSK
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 9094
+          ToPort: 9094
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9092
+          ToPort: 9092
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 2181
+          ToPort: 2181
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Msk Security Group
+  AthenaMskCluster:
+    Type: 'AWS::MSK::Cluster'
+    Properties:
+      ClusterName: !Ref ClusterName
+      KafkaVersion: 2.2.1
+      NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
+      ConfigurationInfo:
+        Arn: !Ref MskConfigArn
+        Revision: 1
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: PLAINTEXT
+          InCluster: true
+      BrokerNodeGroupInfo:
+        InstanceType: !Ref MskInstanceType
+        ClientSubnets: !Ref ClientSubnetIds
+        StorageInfo:
+          EBSStorageInfo:
+            VolumeSize: !Ref VolumeSize
+        SecurityGroups:
+          - Ref: MskSecurityGroup
+      Tags:
+        Name: !Ref ClusterName
+        environment: !Ref Env
+        author: devops
+        email: devops@karrostech.com
+
+Outputs:
+  MSKClusterArn:
+    Description: The Arn for the MSK cluster
+    Value: !Ref AthenaMskCluster

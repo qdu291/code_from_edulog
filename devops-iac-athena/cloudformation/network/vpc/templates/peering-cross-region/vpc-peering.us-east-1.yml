@@ -1,0 +1,64 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creates a Peering for VPC
+Parameters:
+  # Missoula Athena VPC
+  AthMissVPCID:
+    Type: String
+    Description: Athena Missoula VPC ID
+    Default: "vpc-0fe42ec3665451cd8"
+  AthMissPublicSubnetRouteTableID:
+    Type: String
+    Description: Athena Missoula  Public Subnet RouteTable ID
+    Default: "rtb-00f3b7788369bbec0"
+  # Missoula Athena VPC
+  AthMissDevOpsVPCID:
+    Type: String
+    Description: Athena Missoula DevOps VPC ID
+    Default: "vpc-96824ded"
+  AthMissDevOpsSubnetRouteTableID:
+    Type: String
+    Description: Athena Missoula DevOps Public Subnet RouteTable ID
+    Default: "rtb-0b0afe77"
+  # KTVN Athena VPC
+  AthKtvnVPCRegion:
+    Type: String
+    Description: Athena KTVN Non Prod VPC Region
+    Default: "us-east-2"
+  AthKtvnVPCID:
+    Type: String
+    Description: Athena KTVN Non Prod VPC ID
+    Default: "vpc-04b5043bf099e175c"
+  AthKtvnVPCCIDR:
+    Type: String
+    Description: Athena KTVN Non Prod VPC CIDR
+    Default: "10.10.0.0/16"
+Resources:
+  # Missoula & KTVN Non-Prod VPC Peering
+  AthMissoulaPeerKtvnNonProd:
+    Type: "AWS::EC2::VPCPeeringConnection"
+    Properties:
+      VpcId: !Ref AthMissVPCID
+      PeerRegion: !Ref AthKtvnVPCRegion
+      PeerVpcId: !Ref AthKtvnVPCID
+  AthMissoulaPublicSubnetRoute:
+    Description: Add route for Athena Missoula VPC Public Subnet
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AthMissPublicSubnetRouteTableID
+      DestinationCidrBlock: !Ref AthKtvnVPCCIDR
+      VpcPeeringConnectionId: !Ref AthMissoulaPeerKtvnNonProd
+  # Missoula DevOps & KTVN Non-Prod VPC Peering
+  AthMissoulaDevOpsPeerKtvnNonProd:
+    Type: "AWS::EC2::VPCPeeringConnection"
+    Properties:
+      VpcId: !Ref AthMissDevOpsVPCID
+      PeerRegion: !Ref AthKtvnVPCRegion
+      PeerVpcId: !Ref AthKtvnVPCID
+  AthMissoulaDevOpsPublicSubnetRoute:
+    Description: Add route for Athena Missoula VPC Public Subnet
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AthMissDevOpsSubnetRouteTableID
+      DestinationCidrBlock: !Ref AthKtvnVPCCIDR
+      VpcPeeringConnectionId: !Ref AthMissoulaDevOpsPeerKtvnNonProd

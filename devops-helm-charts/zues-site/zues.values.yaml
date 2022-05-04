@@ -1,0 +1,75 @@
+configMap:
+  envType: "nonprod"
+  siteName: "zues"
+  tenantId: "513db804-6103-444a-816f-e9ee6d89567d"
+  karrosGateway: "athenagateway-p01-demo.usw2.karrostech.net"
+  keycloakDomain: "aaa-demo.usw2.karrostech.net"
+  dbHost: "athena-zues-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com"
+  dbName: "Athena"
+  kafkaBootstrapServers: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  athenaKafkaProducers: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  athenaKafkaConsumers: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  geoServerHost: "geoserverservice"
+  geoServerPort: "8070"
+  nosHost: ""
+  nosPort: "8901"
+  cacheHost: "mongo"
+  queueHost: "rabbitmq"
+  queueUser: "edulog"
+  queuePass: "edul0g"
+  dbUser: "edulog"
+  dbPass: "edul0g"
+  keycloakId: "athena"
+  keycloakBackendId: "athena-backend"
+  keycloadSecret: "4fc89ec7-3af8-4649-a014-529ef2975805"
+
+geoserverservice:
+  image:
+    tag: "latest"
+aggregateservice:
+  image:
+    tag: "1.37.5-eks"
+edtaservice:
+  image:
+    tag: "1.37.5-eks"
+gateway:
+  image:
+    tag: "1.37.5-eks"
+geocalculationservice:
+  image:
+    tag: "1.37.5-eks"
+importingservice:
+  image:
+    tag: "1.37.5-eks"
+ivinservice:
+  image:
+    tag: "1.37.5-eks"
+overlayservice:
+  image:
+    tag: "1.37.5-eks"
+routingservice:
+  image:
+    tag: "1.37.5-eks"
+geocodeservice:
+  image:
+    tag: "1.37.5-eks"
+plannedrolloverservice:
+  image:
+    tag: "1.37.5-eks"
+reportservice:
+  image:
+    tag: "1.37.5-eks"
+routingmigration:
+  image:
+    tag: "1.37.5-eks"
+rresservice:
+  image:
+    tag: "1.37.5-eks"
+tnxhubservice:
+  image:
+    tag: "1.37.5-eks"
+
+tags:
+  core: false
+  rideRegistration: false
+  mapOverlay: false

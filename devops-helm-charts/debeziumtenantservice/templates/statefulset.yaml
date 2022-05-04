@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Chart.Name }}
+  labels:
+    name: {{ .Chart.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  serviceName: {{ .Chart.Name }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          ports:
+            - containerPort: {{.Values.service.targetPort}}
+          command: ["java"]
+          args: [
+            "-Djava.security.egd=file:/dev/./urandom",
+            "-Dcom.sun.management.jmxremote",
+            "-Dcom.sun.management.jmxremote.authenticate=false",
+            "-Dcom.sun.management.jmxremote.ssl=false",
+            "-Dcom.sun.management.jmxremote.port=9099",
+            "-Dspring.cloud.inetutils.ignoredInterfaces=ecs-eth0",
+            "-DLOG_PATH=/opt/karros_tech/logs",
+            "-DLOG_FILE=/opt/karros_tech/logs/$SERVICENAME.log",
+            "-Dserver.port=80",
+            "-Ddebezium.cluster.url=$CLUSTER_URL",
+            "-Dmanagement.security.enabled=false",
+            "-Deureka.datacenter=cloud",
+            "-Dmanagement.context-path=/",
+            "-jar", "-Xms256m", "-Xmx1024m", "/home/karros/app.jar"]
+          env:
+            - name: SERVICENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app']
+#            - name: SERVER_PORT
+#              value: {{.Values.service.targetPort}}
+            - name: CLUSTER_URL
+              value: http://debezium.athena-nonprod.com/connectors/
+          volumeMounts:
+            - name: {{ .Chart.Name }}-persistent-storage
+              mountPath: /_data
+  volumeClaimTemplates:
+  - metadata:
+      name: {{ .Chart.Name }}-persistent-storage
+      annotations:
+        volume.beta.kubernetes.io/storage-class: "gp2"
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 20Gi

@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: GeoServer in ECS for Athena AggregateService
+Parameters:
+  Env:
+    Type: String
+    Description: The name of the environment to add this service to
+    AllowedValues:
+      - prod
+      - nonprod
+    Default: nonprod
+  Tenant:
+    Type: String
+    Description: Tenant that we want to deploy GeoServer
+  GSSecurityGroup:
+    Description: GeoServer Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnet1ID:
+    Description: The ID of the 1st private subnet.
+    Type: AWS::EC2::Subnet::Id
+  Subnet2ID:
+    Description: The ID of the 2nd private subnet.
+    Type: AWS::EC2::Subnet::Id
+  # ECS Cluster
+  ECSClusterName:
+    Description: The ECS Cluster that Service will be deployed to
+    Type: String
+  ImageUrl:
+    Type: String
+    Description: ECR Image URI - registry/repository:tag
+  ContainerPort:
+    Type: Number
+    Description: What port number the application inside the docker container is binding to
+    Default: 8080
+  ContainerCpu:
+    Type: Number
+    Description: How much CPU to give the container. 1024 is 1 CPU
+    Default: 512
+  ContainerMemory:
+    Type: Number
+    Description: How much memory in megabytes to give the container
+    Default: 1024
+  DesiredCount:
+    Type: Number
+    Description: How many copies of the service task to run
+    Default: 1
+  GSNamePrefix:
+    Type: String
+    Description: GeoServer Service Name Prefix
+    Default: athena-ecs-geoserver
+  VPCID:
+    Description: ID of the VPC you are deploying into (e.g., vpc-0343606e).
+    Type: AWS::EC2::VPC::Id
+Resources:
+  EcsALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internal
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref Subnet1ID
+        - !Ref Subnet2ID
+      SecurityGroups:
+        - !Ref GSSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-internalalb
+  EcsALBTargetGroupHTTP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 300
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckPort: 8080
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 120
+      HealthyThresholdCount: 2
+      TargetType: ip
+        # - Id: ip
+        # - Port: 8080
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPCID
+  EcsALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EcsALBTargetGroupHTTP
+      LoadBalancerArn: !Ref EcsALB
+      Port: 8080
+      Protocol: HTTP
+  # A log group for storing the stdout logs from this service's containers
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+  # A log group for storing the stdout logs from this service's containers
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+
+  # GeoServerSG:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: Athena GeoServer Security Group
+  #     VpcId: !Ref VPCID
+  #     SecurityGroupIngress:
+  #       # Allow SSM Manage Instance in private subnets
+  #       - IpProtocol: tcp
+  #         FromPort: 80
+  #         ToPort: 80
+  #         CidrIp: !Ref VPCCIDR
+  #       - IpProtocol: tcp
+  #         FromPort: 80
+  #         ToPort: 80
+  #         SourceSecurityGroupId: !GetAtt BackendALBSG.GroupId
+  #       - IpProtocol: tcp
+  #         FromPort: 8080
+  #         ToPort: 8080
+  #         SourceSecurityGroupId: !GetAtt BackendALBSG.GroupId
+  #       - IpProtocol: tcp
+  #         FromPort: 22
+  #         ToPort: 22
+  #         SourceSecurityGroupId: !Ref ManagementSG
+
+  GSIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: environment
+          Value: !Ref Env
+        - Key: author
+          Value: devops
+        - Key: service
+          Value: geoserver
+        - Key: project
+          Value: athena
+  # The task definition. This is a simple metadata description of what
+  # container to run, and what resource requirements it has.
+  GSECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+      Cpu: !Ref ContainerCpu
+      Memory: !Ref ContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt GSIamRole.Arn
+      TaskRoleArn: !GetAtt GSIamRole.Arn
+      ContainerDefinitions:
+        - Name: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+          Cpu: !Ref ContainerCpu
+          Memory: !Ref ContainerMemory
+          Image: !Ref ImageUrl
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: ecs
+          
+  # The service. The service is a resource which allows you to run multiple
+  # copies of a type of task, and gather up their logs and metrics, as well
+  # as monitor the number of running tasks and replace any that have crashed
+  GSECSService:
+    DependsOn: EcsALBListener
+    Type: AWS::ECS::Service
+    Properties:
+      LoadBalancers:
+        - ContainerName: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref EcsALBTargetGroupHTTP
+      ServiceName: !Sub ${GSNamePrefix}-${Env}-${Tenant}
+      Cluster: !Ref ECSClusterName
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          # AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref GSSecurityGroup
+          Subnets:
+            - !Ref Subnet1ID
+            - !Ref Subnet2ID
+      TaskDefinition: !Ref GSECSTaskDefinition
+
+Outputs:
+  GSECSServiceName:
+    Description: Name of GeoServer ECS Service
+    Value: !Ref GSECSService
+  InternalALBURL:
+    Description:
+      The URL of the Internal ALB, you should create a CNAME or alias to this name
+      if you specified a DNS name
+    Value: !Sub http://${EcsALB.DNSName}

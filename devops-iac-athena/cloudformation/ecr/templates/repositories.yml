@@ -1,0 +1,346 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena Backend Services ECR Repositories
+Parameters:
+  AWSMainAccountId:
+    Type: String
+    Description: AWS Main AccountId for sharing the Repositories
+    Default: "690893158275"
+Resources:
+  Gateway:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/gateway
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+  TransactionHub:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/tnxhub-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: tnxhub
+  Routing:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/routing-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: routing
+  GeoCode:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/geocode-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: geocode
+  Importing:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/importing-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: importing
+  Aggregate:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/aggregate-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: aggregate
+  RideRegistrationETL:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/rres-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - "arn:aws:iam::690893158275:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: rres
+  GeoServer:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/geoserver-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: geoserver
+  Overlay:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/overlay-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: overlay
+  EDTA:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/edta-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: edta
+  IVIN:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/ivin-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: ivin
+  GeoCalculation:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/geocalculation-service
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: geocalculation
+  ConfigServer:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: athena/configserver
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Sid: AllowPullFromMainAccount
+            Effect: Allow
+            Principal: 
+              AWS: 
+                - !Sub "arn:aws:iam::${AWSMainAccountId}:root"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+      Tags: 
+        - Key: author
+          Value: devops
+        - Key: project
+          Value: athena
+        - Key: service
+          Value: configserver
+Outputs:
+  TransactionHubArn:
+    Description: Arn of TransactionHub Service Repository
+    Value: !GetAtt TransactionHub.Arn
+  GatewayArn:
+    Description: Arn of Gateway Service Repository
+    Value: !GetAtt Gateway.Arn
+  RoutingArn:
+    Description: Arn of Routing Service Repository
+    Value: !GetAtt Routing.Arn
+  GeoCodeArn:
+    Description: Arn of GeoCode Service Repository
+    Value: !GetAtt GeoCode.Arn
+  ImportingArn:
+    Description: Arn of Importing Service Repository
+    Value: !GetAtt Importing.Arn
+  AggregateArn:
+    Description: Arn of Aggregate Service Repository
+    Value: !GetAtt Aggregate.Arn
+  RideRegistrationETLArn:
+    Description: Arn of RideRegistrationETL Service Repository
+    Value: !GetAtt RideRegistrationETL.Arn
+  GeoServerArn:
+    Description: Arn of GeoServer Service Repository
+    Value: !GetAtt GeoServer.Arn
+  OverlayArn:
+    Description: Arn of Overlay Service Repository
+    Value: !GetAtt Overlay.Arn
+  EDTAArn:
+    Description: Arn of EDTA Service Repository
+    Value: !GetAtt EDTA.Arn
+  IVINArn:
+    Description: Arn of IVIN Service Repository
+    Value: !GetAtt IVIN.Arn
+  GeoCalculationArn:
+    Description: Arn of GeoCalculation Service Repository
+    Value: !GetAtt GeoCalculation.Arn
+  ConfigServerArn:
+    Description: Arn of ConfigServer Service Repository
+    Value: !GetAtt ConfigServer.Arn

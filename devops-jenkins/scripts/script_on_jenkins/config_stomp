@@ -1,0 +1,3 @@
+#!/bin/bash -xe
+sed -i "" "s|guest',|edulog',|g" src/app/app.stompconfig.ts	
+sed -i "" 's|guest|edul0g|g' src/app/app.stompconfig.ts

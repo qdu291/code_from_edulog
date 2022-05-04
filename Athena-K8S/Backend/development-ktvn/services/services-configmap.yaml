@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: development-ktvn
+  name: release
+data:
+  athena.env: |
+    ENV=nonprod
+    TENANT=development-ktvn-eks
+    TENANT_ID=224abdcd-1dc3-441b-a0fe-e90f70a53a1f
+    KARROS_GATEWAY=athenagateway-p01-demo.usw1.karrostech.net
+    KEYCLOAK_DOMAIN=aaa-demo.usw2.karrostech.net
+    KEYCLOAK_ID=athena
+    KEYCLOAK_SECRET=4fc89ec7-3af8-4649-a014-529ef2975805
+    CACHE_HOST=mongo
+    QUEUE_HOST=rabbitmq
+    QUEUE_USER=user
+    QUEUE_PASS=9aUONprz2m
+    DB_HOST=athena-k8s-rds.cr5mzwdlkiuv.us-east-2.rds.amazonaws.com
+    DB_USER=edulog
+    DB_PASS=edul0g
+    DB_NAME=Athena
+    KAFKA_CONSUMER=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    KAFKA_PRODUCER=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    ATHENA_KAFKA_PRODUCERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    ATHENA_KAFKA_CONSUMERS=b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092
+    GEOSERVER_HOST=internal-ath-es-nonprod-dev-38958701.us-east-2.elb.amazonaws.com
+    GEOSERVER_PORT=8070
+    NOS_HOST=34.235.90.218
+    NOS_PORT=8901
+  startup_tnxhub: |
+    #!/bin/bash
+    if [ -n "$ENV" ] && [ $ENV = "prod" ] && [ -n "$KARROS_GATEWAY" ]; then
+      sudo java \
+        -Dkarros.env=${ENV} \
+        -Dathena.env.name=${ENV} \
+        -Dkarros.general.url="https://${KARROS_GATEWAY}" \
+        -Dkarros.login.url="https://${KARROS_GATEWAY}/api/v1/signin" \
+        -Dkarros.keycloak.clientid=${KEYCLOAK_ID} \
+        -Dkarros.keycloak.clientsecret=${KEYCLOAK_SECRET} \
+        -Dkarros.keycloak.url=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/token \
+        -Dkarros.keycloak.logouturl=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/protocol/openid-connect/logout \
+        -Dkarros.keycloak.forgotpasswordurl=https://${KEYCLOAK_DOMAIN}/auth/realms/Edulog/karros-auth/forgot-password \
+        -Dtransactionhub.mongodb.host=${CACHE_HOST} \
+        -Duser.mongodb.host=${CACHE_HOST} \
+        -Dspring.rabbitmq.host=${QUEUE_HOST} \
+        -Dspring.rabbitmq.username=${QUEUE_USER} \
+        -Dspring.rabbitmq.password=${QUEUE_PASS} \
+        -Dopt.host=${NOS_HOST} \
+        -jar -XX:+UseG1GC -Xms256m -Xmx1024m /opt/athena/src/TransactionHUBV2.jar
+    else
+      sudo java \
+        -Dtransactionhub.mongodb.host=${CACHE_HOST} \
+        -Duser.mongodb.host=${CACHE_HOST} \
+        -Dspring.rabbitmq.host=${QUEUE_HOST} \
+        -Dspring.rabbitmq.username=${QUEUE_USER} \
+        -Dspring.rabbitmq.password=${QUEUE_PASS} \
+        -Dathena.env.name=${ENV} \
+        -Dopt.host=${NOS_HOST} \
+        -jar -XX:+UseG1GC -Xms256m -Xmx1024m /opt/athena/src/TransactionHUBV2.jar
+    fi

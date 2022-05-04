@@ -1,0 +1,48 @@
+apiVersion: v1
+data:
+  mapRoles: |
+    - groups:
+      - system:bootstrappers
+      - system:nodes
+      rolearn: arn:aws:iam::696952606624:role/athena-eks-node-group-role
+      username: system:node:{{EC2PrivateDNSName}}
+    - groups:
+      - system:masters
+      - system:bootstrappers
+      - system:nodes
+      rolearn: arn:aws:iam::696952606624:role/CICDEC2InstanceRole
+      username: cicd
+  mapUsers: |
+    - userarn: arn:aws:iam::696952606624:user/atruong
+      username: atruong
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::696952606624:user/dong.nguyen
+      username: dong.nguyen
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::696952606624:user/lnguyen
+      username: lnguyen
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::696952606624:user/tankhuu
+      username: tankhuu
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::696952606624:user/sangkhuu
+      username: sangkhuu
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::696952606624:user/du.ngo
+      username: du.ngo
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::696952606624:user/thanhduong
+      username: thanhduong
+      groups:
+        - system:masters    
+kind: ConfigMap
+metadata:
+  name: aws-auth
+  namespace: kube-system
+  selfLink: /api/v1/namespaces/kube-system/configmaps/aws-auth

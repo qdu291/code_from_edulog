@@ -1,0 +1,13 @@
+GROUP_ID=dbz-image-connectors-group
+CONFIG_STORAGE_TOPIC=dbz-worker-configs
+OFFSET_STORAGE_TOPIC=dbz-worker-offsets
+DBZ_STATUSES_TOPIC=dbz-worker-statuses
+BOOTSTRAP_SERVERS=b-2.dev-msk.lwwxjz.c3.kafka.us-east-2.amazonaws.com:9092,b-1.dev-msk.lwwxjz.c3.kafka.us-east-2.amazonaws.com:9092
+KEY_CONVERTER=org.apache.kafka.connect.storage.StringConverter
+VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+KEY_CONVERTER_SCHEMAS_ENABLE=false
+VALUE_CONVERTER_SCHEMAS_ENABLE=false
+INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.storage.StringConverter
+INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+INTERNAL_KEY_CONVERTER_SCHEMAS_ENABLE=false
+INTERNAL_VALUE_CONVERTER_SCHEMAS_ENABLE=false

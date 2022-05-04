@@ -1,0 +1,433 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy Athena Project Tenant Deployment Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Athena Deployment Configuration
+        Parameters:
+          - Tenant
+          - TenantId
+          - Env
+          - KarrosGateway
+          - KeycloakDomain
+          - KeycloakId
+          - KeycloakSecret
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - VPCStackName
+      - Label:
+          default: Amazon EC2 Configuration
+        Parameters:
+          - KeyPairName
+      - Label:
+          default: Amazon RDS (PostgreSQL) Configuration
+        Parameters:
+          - DBAllocatedStorage
+          - DBMaxAllocatedStorage
+          - DBInstanceClass
+          - DBIops
+          - DBMasterUserPassword
+          - DBMasterUsername
+          - DBMultiAZ
+          - DBSnapshotIdentifier
+          # - DBName
+          - DBParameterGroupName
+          - DBStorageType
+          - DBBackupRetentionPeriod
+      - Label:
+          default: Athena Backend Configuration
+        Parameters:
+          - BESSLCertificateId
+          - BEDBUser
+          - BEDBPassword
+          - BEDomain
+          - BEHostedZoneId
+      - Label:
+          default: Athena Frontend Configuration
+        Parameters:
+          - FEDomain
+          - FEHostedZoneId
+          - FESSLCertificateId
+      - Label:
+          default: Debezium Configuration
+        Parameters:
+          - KafkaBrokers
+          - ZookeeperBrokers
+      - Label:
+          default: WOS,NOS Configuration
+        Parameters:
+          - WOSNOSAMIId
+          - WOSNOSInstanceType
+      - Label:
+          default: Monitoring Configuration
+        Parameters:
+          - AlarmTopic
+    ParameterLabels:
+      Tenant:
+        default: Tenant that we want to deploy Athena Project
+      TenantId:
+        default: Tenant ID that we want to deploy Athena Project
+      KarrosGateway:
+        default: URL of KarrosGateway Endpoint for Authentication
+      Env:
+        default: "Environment that we want to deploy Athena Project. Ex: prod | nonprod"
+      KeycloakDomain:
+        default: Karros Login with KeyCloak Domain
+      KeycloakId:
+        default: Karros Login with KeyCloak Client Id
+      KeycloakSecret:
+        default: Karros Login with KeyCloak Client Secret
+      VPCStackName:
+        default: VPC Stack Athena deployed into
+      KeyPairName:
+        default: Default KeyPair for all instances in Athena
+      DBAllocatedStorage:
+        default: RDS PostgreSQL DB Storage Size
+      DBMaxAllocatedStorage:
+        default: RDS PostgreSQL DB Max Storage Size for AutoScaling Storage
+      DBInstanceClass:
+        default: RDS PostgreSQL DB Instance Type
+      DBIops:
+        default: RDS PostgreSQL DB Iops. Default is 1000
+      DBMasterUsername:
+        default: RDS PostgreSQL postgres user
+      DBMasterUserPassword:
+        default: RDS PostgreSQL postgres user password
+      DBMultiAZ:
+        default: RDS PostgreSQL DB enable HA
+      DBSnapshotIdentifier:
+        default: RDS PostgreSQL DB Snapshot to restore DB from
+      DBParameterGroupName:
+        default: RDS PostgreSQL DB Custom Parameter Group If we need
+      DBStorageType:
+        default: RDS PostgreSQL DB Storage Type.
+      DBBackupRetentionPeriod:
+        default: RDS PostgreSQL DB Retention Period
+      BESSLCertificateId:
+        default: Backend Certificate Manager SSL Cert ARN
+      BEDBUser:
+        default: Backend DB User to Access RDS PostgreSQL
+      BEDBPassword:
+        default: Backend DB User Password to Access RDS PostgreSQL
+      BEDomain:
+        default: Domain to deploy backend ALB
+      BEHostedZoneId:
+        default: Route53 Hosted Zone Id
+      FEDomain:
+        default: Domain to deploy frontend CloudFront
+      FEHostedZoneId:
+        default: Route53 Hosted Zone Id
+      FESSLCertificateId:
+        default: Frontend Certificate Manager SSL Cert ARN
+      KafkaBrokers:
+        default: List of Kafka Brokers (MSK)
+      ZookeeperBrokers:
+        default: List of ZooKeepers (MSK)
+      WOSNOSAMIId:
+        default: AMI ID for WOS,NOS
+      WOSNOSInstanceType:
+        default: Instance Type for WOS,NOS
+      AlarmTopic:
+        default: SNS Topic for Alarms
+Parameters:
+  # Athena Deployment Configuration
+  Env:
+    Description: Environment that we want to deploy Athena Project
+    Type: String
+    Default: nonprod
+    AllowedValues:
+      - "nonprod"
+      - "prod"
+  Tenant:
+    Description: Tenant that we want to deploy Athena Project
+    Type: String
+  TenantId:
+    Description: Tenant ID that we want to deploy Athena Project
+    Type: String
+  KarrosGateway:
+    Description: URL of KarrosGateway Endpoint for Authentication
+    Type: String
+    Default: athenagateway-p01-demo.usw1.karrostech.net
+  KeycloakDomain:
+    Description: Karros Login with KeyCloak Domain
+    Type: String
+    Default: "aaa-demo.usw2.karrostech.net"
+  KeycloakId:
+    Description: Karros Login with KeyCloak Client Id
+    Type: String
+    Default: "athena"
+  KeycloakBEId:
+    Description: Karros Login with KeyCloak Client Backend Id
+    Type: String
+    Default: "athena-backend"
+  KeycloakSecret:
+    Description: Karros Login with KeyCloak Client Secret
+    Type: String
+    Default: "4fc89ec7-3af8-4649-a014-529ef2975805"
+  # Network Configuration
+  VPCStackName:
+    Description: The VPC that Athena Project resources will run on
+    Type: String
+    Default: edulogvn-prod-vpc
+  # EC2 Instance Configuration
+  KeyPairName:
+    Description: "EC2 KeyPair Name"
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: edulogvn-devops
+  # Amazon RDS (PostgreSQL) Configuration
+  DBAllocatedStorage:
+    Description: "PostgreSQL RDS Allocated Storage"
+    Type: Number
+    Default: 50
+  DBMaxAllocatedStorage:
+    Description: "PostgreSQL RDS Max Allocated Storage for Storage Autoscaling"
+    Type: Number
+    Default: 150
+  DBInstanceClass:
+    Description: "The name of the compute and memory capacity class of the Amazon RDS (PostgreSQL) DB instance."
+    Type: String
+    ConstraintDescription: Must select a valid database instance type.
+    Default: db.t3.small
+  DBIops:
+    Description: DB Iops. Used only when io1 specified for the StorageType property
+    Type: Number
+    AllowedValues:
+      - "1000"
+      - "2000"
+      - "3000"
+      - "4000"
+      - "5000"
+      - "6000"
+      - "7000"
+      - "8000"
+      - "9000"
+      - "10000"
+    ConstraintDescription: "1000 Iops min and increased in 1K increments. "
+    Default: "1000"
+  DBMasterUserPassword:
+    Description: The database admin account password
+    Type: String
+    AllowedPattern: (?=^.{6,255}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*
+    ConstraintDescription: Min 8 chars.
+    MaxLength: "64"
+    MinLength: "8"
+    NoEcho: "True"
+  DBMasterUsername:
+    Description: The database admin account username. Default is postgres for PostgreSQL
+    Type: String
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+    MaxLength: "16"
+    MinLength: "1"
+    NoEcho: "true"
+    Default: postgres
+  DBMultiAZ:
+    Description:
+      Specifies if the database instance is a multiple Availability Zone
+      deployment.
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+  DBSnapshotIdentifier:
+    Description: The identifier for the DB snapshot to restore from (leave empty for a new database)
+    Type: String
+    Default: athena-base-db-snap
+  DBParameterGroupName:
+    Description: The name of an existing DB parameter group
+    Type: String
+    Default: ""
+  DBStorageType:
+    Description: The storage type associated with this database instance (standard, gp2, io1)
+    Type: String
+    AllowedValues: [standard, gp2, io1, ""]
+    Default: gp2
+  DBBackupRetentionPeriod:
+    Description: The number of days for which automatic DB snapshots are retained
+    Type: String
+    Default: "7"
+  # Cache & Queue Configuration
+  BESSLCertificateId:
+    Description: "The ARN of the SSL certificate to use for the Backend ALB"
+    Type: String
+    Default: arn:aws:acm:us-east-2:690893158275:certificate/9978ae1d-16b0-4162-9add-3fb57083d06d
+  BEDBUser:
+    Description: "PostgreSQL User that Backend uses to connect"
+    Type: String
+    Default: "edulog"
+  BEDBPassword:
+    Description: "PostgreSQL User Password that Backend uses to connect"
+    Type: String
+    Default: "edul0g"
+    NoEcho: "True"
+  BEDomain:
+    Description: Backend Root Domain which hosted in Route53
+    Type: String
+    Default: karrostech.net
+  BEHostedZoneId:
+    Description: Route53 Hosted Zone for Backend
+    Type: String
+    Default: "Z33NWCVN5UFMNZ"
+  # Athena Frontend Configuration
+  FESSLCertificateId:
+    Description: "The ARN of the SSL certificate to use for the Frontend CloudFront"
+    Type: String
+    Default: arn:aws:acm:us-east-1:690893158275:certificate/a3d3e0cf-abd2-496d-a5b7-a7bf00881df6
+  FEDomain:
+    Description: Frontend Root Domain which hosted in Route53
+    Type: String
+    Default: karrostech.io
+  FEHostedZoneId:
+    Description: Route53 Hosted Zone for Frontend
+    Type: String
+    Default: "ZPNED8AYA0B4K"
+  KafkaBrokers:
+    Description: List of Kafka Brokers (MSK)
+    Type: String
+    Default: "b-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092,b-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:9092"
+  ZookeeperBrokers:
+    Description: List of ZooKeepers (MSK)
+    Type: String
+    Default: "z-1.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:2181,z-2.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:2181,z-3.athenamsk.eg7z0i.c3.kafka.us-east-2.amazonaws.com:2181"
+  WOSNOSAMIId:
+    Description: "WOS-NOS Services Base/Release AMI"
+    Type: AWS::EC2::Image::Id
+    Default: ami-0f04cd9cfa9bbd426
+  WOSNOSInstanceType:
+    Description: "WOS-NOS Instance Type"
+    Type: String
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - r5.large
+      - r5.xlarge
+      - r5.2xlarge
+    Default: t3.large
+    ConstraintDescription: Choose an instance type.
+  DebeziumControllerAPI:
+    Type: String
+    Description: "Debezium Controller API for Controlling Debezium Connectors"
+    Default: "https://zzciu1ond8.execute-api.us-east-2.amazonaws.com/default/debezium-controller"
+  DebeziumControllerKey:
+    Type: String
+    Description: "Debezium Controller Key for Controlling Debezium Connectors"
+    Default: "Y4BwX5q58bfcfeaig7iR6u1CBINwb6dA5gY7rc70"
+  AlarmTopic:
+    Description: SNS Topic for Alarm
+    Type: String
+    Default: arn:aws:sns:us-east-2:696952606624:athena-alarms
+Resources:
+  SecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: securitygroups-eks-uat.yml
+      Parameters:
+        VPCID:
+          Fn::ImportValue: !Sub ${VPCStackName}-VPCID
+        VPCCIDR:
+          Fn::ImportValue: !Sub ${VPCStackName}-VPCCIDR
+        ManagementSG:
+          Fn::ImportValue: !Sub ${VPCStackName}-SSMSG
+  RDSStack:
+    # Description: PostgreSQL RDS Stack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: rds-postgresql.yml
+      Parameters:
+        DBAllocatedStorage: !Ref DBAllocatedStorage
+        DBMaxAllocatedStorage: !Ref DBMaxAllocatedStorage
+        DBBackupRetentionPeriod: !Ref DBBackupRetentionPeriod
+        DBInstanceClass: !Ref DBInstanceClass
+        DBIops: !Ref DBIops
+        DBMasterUserPassword: !Ref DBMasterUserPassword
+        DBMasterUsername: !Ref DBMasterUsername
+        DBMultiAZ: !Ref DBMultiAZ
+        DBInstanceIdentifier: !Sub ${AWS::StackName}-rds
+        DBEngineVersion: 12.2
+        DBSnapshotIdentifier: !Ref DBSnapshotIdentifier
+        DBParameterGroupName: !Ref DBParameterGroupName
+        DBStorageType: !Ref DBStorageType
+        DBSecurityGroup: !GetAtt SecurityGroupStack.Outputs.PostgreSQLSG
+        Subnet1ID:
+          Fn::ImportValue: !Sub ${VPCStackName}-PrivateSubnet2ID
+        Subnet2ID:
+          Fn::ImportValue: !Sub ${VPCStackName}-PrivateSubnet3ID
+        VPCID:
+          Fn::ImportValue: !Sub ${VPCStackName}-VPCID
+  FEStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: frontend.yml
+      Parameters:
+        Tenant: !Ref Tenant
+        FEDomain: !Ref FEDomain
+        FEHostedZoneId: !Ref FEHostedZoneId
+        FESSLCertificateId: !Ref FESSLCertificateId
+  WQStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: webquery.yml
+      Parameters:
+        Tenant: !Ref Tenant
+        WQDomain: !Ref FEDomain
+        WQHostedZoneId: !Ref FEHostedZoneId
+        WQSSLCertificateId: !Ref FESSLCertificateId
+  WOSNOSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: wos-nos.yml
+      Parameters:
+        Tenant: !Ref Tenant
+        KeyPairName: !Ref KeyPairName
+        WOSNOSAMIId: !Ref WOSNOSAMIId
+        WOSNOSInstanceType: !Ref WOSNOSInstanceType
+        WOSNOSSecurityGroup: !GetAtt SecurityGroupStack.Outputs.WOSNOSSG
+        ManagementSecurityGroup:
+          Fn::ImportValue: !Sub ${VPCStackName}-SSMSG
+        VPCID:
+          Fn::ImportValue: !Sub ${VPCStackName}-VPCID
+        SubnetId:
+          Fn::ImportValue: !Sub ${VPCStackName}-PrivateSubnet2ID
+        RDSEndpoint: !GetAtt RDSStack.Outputs.RDSEndPoint
+  # MetricsStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: metrics.yml
+  #     Parameters:
+  #       Tenant: !Ref Tenant
+  # AlarmsStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: alarms.yml
+  #     Parameters:
+  #       Tenant: !Ref Tenant
+  #       RDSDBIdentifier: !GetAtt RDSStack.Outputs.DBIdentifier
+  #       AlarmTopic: !Ref AlarmTopic
+Outputs:
+  FrontendURL:
+    Description: The URL of the Athena Tenant website
+    Value: !GetAtt FEStack.Outputs.FEURL
+  FECloudFrontId:
+    Description: CloudFront Distribution Id of Frontend
+    Value: !GetAtt FEStack.Outputs.CloudFrontId
+  WebQueryURL:
+    Description: The URL of the Athena WebQuery website
+    Value: !GetAtt WQStack.Outputs.WQURL
+  WQCloudFrontId:
+    Description: CloudFront Distribution Id of WebQuery
+    Value: !GetAtt WQStack.Outputs.CloudFrontId
+  RDSEndpoint:
+    Description: The Endpoint of RDS
+    Value: !GetAtt RDSStack.Outputs.RDSEndPoint

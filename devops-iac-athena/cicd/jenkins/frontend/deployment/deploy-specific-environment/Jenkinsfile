@@ -1,0 +1,75 @@
+// Description: Deploy Athena Frontend to Specific Environments directly.
+// Discard old builds: Max # of builds to keep: 20
+// Do not allow concurrent builds
+
+TENANTS = [ 'spiderman-dev', 'spiderman', 'spiderman1', 'deadpool']
+
+def DeployToTenant(tenant, domain, configFile, cloudfrontId) {
+  echo "=> Deploy to ${tenant}"
+  dir('dist') {
+    sh 'ls -lh'
+    echo "=> Update config in assets/${configFile}.json"
+    sh "cp assets/${configFile}.json /tmp/${configFile}.${tenant}.json"
+    // sh "update-fe-config ${configFile} ${VERSION} ${tenant}"
+    // sh 'cp /tmp/${configFile}.${tenant}.json assets/${configFile}.json'
+
+    echo "=> Deploy to https://athena-${tenant}.${domain}"
+    echo "=> Remove files on s3://athena-${tenant}.${domain}"
+    // sh '''#!/bin/bash -xe
+    //   aws s3 rm s3://athena-${tenant}.${domain} --recursive
+    // '''
+    echo "=> Upload files to s3://athena-${tenant}.${domain}"
+    // sh '''#!/bin/bash -xe
+    //   aws s3 cp --acl public-read --recursive . s3://athena-${tenant}.${domain}/
+    // '''
+    echo "=> Set Cache-Control for Service Worker"
+    // sh '''#!/bin/bash -xe
+    //   aws s3 cp --acl public-read --cache-control max-age=0 ./index.html s3://athena-${tenant}.${domain}/
+    //   aws s3 cp --acl public-read --cache-control max-age=0 ./ngsw-worker.js s3://athena-${tenant}.${domain}/
+    // '''
+  }
+  echo "=> Invalidate CloudFront ${tenant} with DistributionID ${cloudfrontId}"
+  // sh '''#!/bin/bash -xe
+  //   aws cloudfront create-invalidation --distribution-id ${cloudfrontId} --paths \"/*\"
+  // '''
+}
+
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'VERSION', description: 'Version Package to Pull Artifact')
+  }
+
+  environment {
+    CONFIG_FILE = 'systemconfig'
+  }
+
+  stages {
+    stage('Pull Artifact') {
+      environment {
+        S3_PATH = "s3://${ATH_S3_ARTIFACTS_BUCKET}/athena/frontend/build"
+        FILE_NAME = "${VERSION}.tar.gz"
+      }
+      steps {
+        sh 'aws s3 cp ${S3_PATH}/${FILE_NAME} .'
+        sh 'tar zxvf ${FILE_NAME}'
+      }
+    }
+    stage('Deploy to list of specific environments') {
+      steps {
+        script {
+          TENANTS.each { TENANT ->
+            DeployToTenant("${TENANT}", "${ATH_FE_DOMAIN}", "${CONFIG_FILE}", "E3KLVVQ41JU8TM")
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}

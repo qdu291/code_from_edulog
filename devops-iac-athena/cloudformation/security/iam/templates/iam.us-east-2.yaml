@@ -1,0 +1,336 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "EdulogVN IAM Template for Athena Project"
+Parameters:
+  SamlKarrosGsuiteProviderArn:
+    Type: String
+    Description: SAML Karros Gsuite Provider
+    Default: arn:aws:iam::690893158275:saml-provider/KarrosGsuite
+Resources:
+  # Policies ## AMI ReadOnly Policy
+  AmiReadOnlyPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowReadOnlyAMI
+      Description: Allow Readonly Access on AMIs
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ec2:DescribeImages
+            Resource: "*"
+            # Condition:
+            #   StringEquals:
+            #     ec2:ResourceTag/project: athena
+  Ec2ReadOnlyPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowReadOnlyEC2
+      Description: Allow Readonly Access on EC2
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ec2:Describe*
+            Resource: "*"
+  AllowAccessAthenaArtifactsBucketPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowAccessAthenaArtifactsBucket
+      Description: Allow Read/Write Access on Athena Artifacts Bucket
+      PolicyDocument: # policy document - can be JSON or YAML
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - arn:aws:s3:::ktvn-athena-artifacts
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource:
+              - Fn::Sub:
+                  - ${BucketArn}/*
+                  - BucketArn: arn:aws:s3:::ktvn-athena-artifacts
+  AllowCreateCFNChangeSetPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowCreateCFNChangeSetPolicy
+      Description: Allow Create CloudFormation ChangeSets Policy
+      PolicyDocument: # policy document - can be JSON or YAML
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateChangeSet
+              - cloudformation:CreateUploadBucket
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - arn:aws:s3:::cf-templates-*
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Sub:
+                  - ${BucketArn}
+                  - BucketArn: arn:aws:s3:::cf-templates-*
+  AllowAccessAthenaBackupBucketPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowAccessAthenaBackupBucket
+      Description: Allow Read/Write Access on Athena Backup Bucket
+      PolicyDocument: # policy document - can be JSON or YAML
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - arn:aws:s3:::edulog-athena-backup
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - Fn::Sub:
+                  - ${BucketArn}/athena/database/nonprod/*
+                  - BucketArn: arn:aws:s3:::edulog-athena-backup
+  # Roles #
+  AthGsuiteDeveloperRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - !Ref Ec2ReadOnlyPolicy
+        - !Ref AmiReadOnlyPolicy
+        - !Ref AllowAccessAthenaArtifactsBucketPolicy
+        - !Ref AllowAccessAthenaBackupBucketPolicy
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref SamlKarrosGsuiteProviderArn
+            Action: sts:AssumeRoleWithSAML
+            Condition:
+              StringEquals:
+                "SAML:aud": "https://signin.aws.amazon.com/saml"
+      Tags:
+        - Key: environment
+          Value: management
+        - Key: author
+          Value: devops
+        - Key: type
+          Value: google_idp
+        - Key: project
+          Value: athena
+  DeadPoolGsuiteDeveloperRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - !Ref Ec2ReadOnlyPolicy
+        - !Ref AmiReadOnlyPolicy
+        - !Ref AllowAccessAthenaArtifactsBucketPolicy
+        - arn:aws:iam::aws:policy/AmazonMSKReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerServiceFullAccess
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref SamlKarrosGsuiteProviderArn
+            Action: sts:AssumeRoleWithSAML
+            Condition:
+              StringEquals:
+                "SAML:aud": "https://signin.aws.amazon.com/saml"
+      Tags:
+        - Key: environment
+          Value: management
+        - Key: author
+          Value: devops
+        - Key: type
+          Value: google_idp
+        - Key: project
+          Value: athena
+  # PrometheusAssumeRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             AWS:
+  #               - !Sub "arn:aws:iam::<MAIN-ACCOUNT-ID>:root"
+  #           Action:
+  #             - "sts:AssumeRole"
+  #     ManagedPolicyArns:
+  #       - "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+  PrometheusRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+      Policies:
+        - PolicyName: PrometheusAssumeRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "sts:AssumeRole"
+                Resource: "*"
+  # Group #
+  ## Athena Log Viewers
+  AthLogViewers:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: ATH-LOG-VIEWERS
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
+  ## Athena Developers
+  AthDevelopers:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: ATH-DEVELOPERS
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+        - !Ref Ec2ReadOnlyPolicy
+  ## Athena Onboarding DevOps
+  AthOnboardingDevOps:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: ATH-ONBOARDING-DEVOPS
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+        - !Ref AllowCreateCFNChangeSetPolicy
+
+  # Users #
+  amineMeda:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthLogViewers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: amine.meda
+  rickMortensen:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: rmortensen
+  julienVienne:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: jvienne
+  JPigois:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: jpigois
+  DavidSilva:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: davidsilva
+  lphilippeaux:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: lphilippeaux
+  cpoggi:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: cpoggi
+  rsessford:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: rsessford
+  fcondette:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: fcondette
+  jtruong:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: jtruong
+  ereed:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Ref AthDevelopers
+      LoginProfile:
+        Password: P@assword123
+        PasswordResetRequired: true
+      UserName: ereed
+
+Outputs:
+  DeadPoolGsuiteDeveloperRoleArn:
+    Description: DeadPool Gsuite Developer Role ARN
+    Value: !GetAtt DeadPoolGsuiteDeveloperRole.Arn
+  AthGsuiteDeveloperRoleArn:
+    Description: Athena Gsuite Developer Role ARN
+    Value: !GetAtt AthGsuiteDeveloperRole.Arn

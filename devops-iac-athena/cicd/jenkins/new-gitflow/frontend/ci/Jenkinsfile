@@ -1,0 +1,108 @@
+// Notify to channel
+def notifyGChat(branch, commit, channel) {
+  def DURATION = currentBuild.durationString.split(' and ')[0]
+  hangoutsNotify message: "Status: *${currentBuild.result}*\nStage: CI - Build & Package\nBranch: ${branch}\nCommit: ${commit}\nDuration: ${DURATION}",
+    token: "${channel}", threadByJob: true
+}
+
+def notifySlack(branch, commit, channel) {
+  def DURATION = currentBuild.durationString.split(' and ')[0]
+  def blocks = [
+    [
+      "type": "section",
+      "text": [
+        "type": "mrkdwn",
+        "text": ":rocket: *AthenaUI"
+      ]
+    ],
+      [
+      "type": "divider"
+    ],
+    [
+      "type": "section",
+      "text": [
+        "type": "mrkdwn",
+        "text": "Status: *${currentBuild.result}*\nStage: CI - Build & Package\nBranch: ${branch}\nCommit: ${commit}\nDuration: ${DURATION}"
+      ]
+    ]
+  ]
+  slackSend(channel: "#${channel}", blocks: blocks)
+}
+
+pipeline {
+  agent any
+
+  environment {
+    BRANCH_NAME = GIT_BRANCH.substring(GIT_BRANCH.lastIndexOf('/') + 1, GIT_BRANCH.length()).trim()
+    SHORT_COMMIT = GIT_COMMIT.substring(0,7)
+    BUILD_VERSION = "${GIT_COMMIT}"
+
+    ARTIFACT_PATH = "s3://${ATH_S3_ARTIFACTS_BUCKET}/frontend/build"
+    JOB_DEPLOY = 'athena/frontend/deployment/ui-cd'
+
+    GCHAT_TOKEN = "${GCHAT_TOKEN_ATH_FE_CICD}"
+  }
+
+  stages {
+    stage('Build & Package') {
+      steps {
+        echo "=> Install prerequisite packages with build_version: $BUILD_VERSION"
+        sh 'npm install > /dev/null'
+        sh 'npm run postinstall'
+        // Make sure building angularjs jobs not run at the same time
+        lock('ATH_FE_BUILDER') {
+          echo "=> Building..."
+          sh 'npm run build:prod'
+        }
+
+        echo "=> Package Build Version"
+        sh 'tar zcvf ${BUILD_VERSION}.tar.gz dist/'
+        echo "==> Upload to S3 Artifact"
+        sh 'aws s3 cp ${BUILD_VERSION}.tar.gz ${ARTIFACT_PATH}/'
+      }
+      post {
+        failure {
+          echo "=> Build failure"
+          notifyGChat("${BRANCH_NAME}", "${SHORT_COMMIT}", "${GCHAT_TOKEN}")
+          notifySlack("${BRANCH_NAME}", "${SHORT_COMMIT}", "${GCHAT_TOKEN}")
+        }
+        success {
+          echo "=> Build success"
+          notifyGChat("${BRANCH_NAME}", "${SHORT_COMMIT}", "${GCHAT_TOKEN}")
+          notifySlack("${BRANCH_NAME}", "${SHORT_COMMIT}", "${GCHAT_TOKEN}")
+        }
+      }
+    }
+    stage('Deploy') {
+      when { anyOf { 
+        branch 'development-ktvn'; 
+        branch 'development-fr';
+        branch 'ktvn'; 
+        branch 'fr'; 
+        branch 'develop';
+        branch 'master';
+        branch pattern: "release/.+", comparator: "REGEXP" 
+        branch pattern: "hotfix/.+", comparator: "REGEXP" 
+      } }
+      steps {
+        build job: "${JOB_DEPLOY}", parameters: [
+          string(name: 'branch_name', value: "${BRANCH_NAME}"),
+          string(name: 'artifact_path', value: "${ARTIFACT_PATH}/${BUILD_VERSION}.tar.gz"),
+          string(name: 'build_version', value: "${BUILD_VERSION}"),
+          string(name:'short_version', value: "${SHORT_COMMIT}")]
+      }
+    }
+  }
+  post {
+    always {
+      echo "=> Clean Workspace after run"
+      cleanWs()
+    }
+    success {
+      echo "=> Full Pipeline Success"
+    }
+    failure {
+      echo "=> Full Pipeline Failure"
+    }
+  }
+}

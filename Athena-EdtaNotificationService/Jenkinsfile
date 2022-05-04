@@ -1,0 +1,166 @@
+#!groovy
+
+node {
+    properties([
+        buildDiscarder(
+            logRotator(
+		          artifactDaysToKeepStr: "10",
+		          artifactNumToKeepStr: "10",
+		          daysToKeepStr: "20",
+		          numToKeepStr: "20"
+	          )
+        )
+    ])
+  // GO!
+    def mvnHome
+    def serviceName = 'athena-edtanotificationservice'
+    def gitServiceName = 'Athena-EdtaNotificationService'
+    def ecrRepo = '690893158275.dkr.ecr.us-east-2.amazonaws.com'
+    def ecrRegion = 'ecr:us-east-2:jenkins_for_k8'
+    def ecrRepoProd = '690893158275.dkr.ecr.us-west-2.amazonaws.com'
+    def ecrRegionProd = 'ecr:us-west-2:jenkins_for_k8'
+    try {
+        notifyBuild('STARTED')
+        stage('Preparation') {
+            // Get the Maven tool.
+            // ** NOTE: This 'M3' Maven tool must be configured
+            // **       in the global configuration.
+            mvnHome = '/usr'
+        }
+        stage('Checkout') {
+            // Checkout code from repository
+             checkout([
+                 $class: 'GitSCM',
+                 branches: scm.branches,
+                 extensions: scm.extensions + [[$class: 'CleanCheckout'], [$class: 'LocalBranch', localBranch: env.BRANCH_NAME]],
+                 userRemoteConfigs: scm.userRemoteConfigs
+           ])
+        }
+        // Set build version for develop and release branches
+        stage("Set build version") {
+            if (env.BRANCH_NAME == "develop" || env.BRANCH_NAME == "release"){
+              def pomVersion = sh(script: 'mvn -q -Dexec.executable=\'echo\' -Dexec.args=\'${project.version}\' --non-recursive exec:exec', returnStdout: true).trim()
+              def gitCommit = sh(script: "git rev-parse HEAD| cut -c 1-12", returnStdout: true).trim()
+              buildVersion = pomVersion.replaceAll(/-SNAPSHOT/, ".${BUILD_NUMBER}.${gitCommit}")
+              sh "echo ${buildVersion}"
+              
+              sh "${mvnHome}/bin/mvn versions:set -DnewVersion=${buildVersion}"
+            }
+          }
+
+        stage('Build') {
+            def sonarUrl = 'http://10.20.10.155:9000'
+            withSonarQubeEnv('SonarQube') {
+                sh "${mvnHome}/bin/mvn -version"
+                sh "${mvnHome}/bin/mvn clean install -U sonar:sonar -Dsonar.host.url=${sonarUrl} -Dsonar.sources=src -Dsonar.test.inclusions=src/test/java/* -U org.jacoco:jacoco-maven-plugin:prepare-agent -Dmaven.test.failure.ignore=true"
+            }
+        }
+
+        stage('Dockerize') {
+            // Dockerize develop branch
+            if (env.BRANCH_NAME == "develop"){
+            docker.withRegistry("https://${ecrRepo}", "${ecrRegion}") {
+                def image = docker.build("${serviceName}", "--build-arg BUILD_VERSION=${buildVersion} .")
+                        image.push("latest")
+                    }
+            }
+
+            // Dockerize release branch
+            if (env.BRANCH_NAME == "release"){
+            docker.withRegistry("https://${ecrRepoProd}", "${ecrRegionProd}") {
+                def image = docker.build("${serviceName}:${buildVersion}", "--build-arg BUILD_VERSION=${buildVersion} .")
+                        image.push("latest")
+                        image.push("${buildVersion}")
+                    }
+            }
+
+            // Dockerize HOTFIX branch
+            // if (env.BRANCH_NAME =~ "^HOTFIX"){
+            // docker.withRegistry("https://${ecrRepoProd}", "${ecrRegionProd}") {
+            //     def image = docker.build("${serviceName}:${buildVersion}", "--build-arg BUILD_VERSION=${pomVersion} .")
+            //             image.push("${buildVersion}")
+            //         }
+            // }
+            // // Dockerize CANARY branch
+            // if (env.BRANCH_NAME.endsWith("CANARY")){
+            // docker.withRegistry("https://${ecrRepo}", "${ecrRegion}") {
+            //     def image = docker.build("${serviceName}:${buildVersion}", "--build-arg BUILD_VERSION=${buildVersion} .")
+            //             image.push("${buildVersion}")
+            //         }
+            // }
+        }
+
+        stage('Deploy') {
+            if (env.BRANCH_NAME == "develop"){
+                sh "${mvnHome}/bin/mvn deploy"
+                sh "cd target && aws s3api put-object --acl bucket-owner-full-control --bucket karros-tech-relics --content-type application/java-archive --key  develop/${gitServiceName}.jar --body=AthenaEdtaNotification-${buildVersion}.jar"
+                // sh 'cd /opt/karros_tech/ansible && python deploy.py --service systemManagementWSAPI --pod p01.use2.dev --type spring'
+                sh """
+                  kubectl config use-context dev
+                  kubectl -n default scale --replicas=0 deployment athena-edtanotification
+                  kubectl -n default scale --replicas=1 deployment athena-edtanotification
+                """
+            }
+
+            // if (env.BRANCH_NAME.endsWith("CANARY")) {
+            //     // Run the maven deploy
+            //     sh "${mvnHome}/bin/mvn deploy -DskipITs"
+            //     sh """
+            //       kubectl config use-context dev
+            //       kubectl -n default set image deployment ${serviceName} ${serviceName}-container=${ecrRepo}/${serviceName}:${buildVersion} --record
+            //       """
+            // }
+
+            // Deploy release branch
+            if (env.BRANCH_NAME == "release") {
+                // Run the maven deploy
+                // sh "${mvnHome}/bin/mvn deploy" // skip deploy to archiva for now
+                sh "cd target && aws s3api put-object --acl bucket-owner-full-control --bucket karros-tech-relics --content-type application/java-archive --key  production/${gitServiceName}-${buildVersion}.jar --body=AthenaEdtaNotification-${buildVersion}.jar"
+                // sh 'cd /opt/karros_tech/ansible && python deploy.py --service systemManagementWSAPI --pod p01.usw2.stage --type spring'
+                sh """
+                  kubectl config use-context stage
+                  kubectl -n default set image deployment athena-edtanotification athena-edtanotification-container=${ecrRepoProd}/${serviceName}:${buildVersion} --record
+                  """
+
+            }
+
+            if (env.BRANCH_NAME == "demo") {
+                // Run the maven deploy
+                // sh "${mvnHome}/bin/mvn deploy" // skip deploy to archiva for now
+                //sh "cd target && aws s3api put-object --acl bucket-owner-full-control --bucket karros-tech-relics --content-type application/java-archive --key  production/${gitServiceName}-${buildVersion}.jar --body=AthenaEdtaNotification-${buildVersion}.jar"
+                // sh 'cd /opt/karros_tech/ansible && python deploy.py --service systemManagementWSAPI --pod p01.usw2.stage --type spring'
+                sh """
+                  kubectl config use-context demo
+                  kubectl -n default scale --replicas=0 deployment athena-edtanotification
+                  kubectl -n default scale --replicas=1 deployment athena-edtanotification
+                """
+
+            }
+        }
+    }
+    catch (e) {
+        // If there was an exception thrown, the build failed
+        currentBuild.result = "FAILED"
+        throw e
+    } finally {
+        // Success or failure, always send notifications
+        notifyBuild(currentBuild.result)
+    }
+}
+// We will chat with Google Hangouts Chat now
+
+
+def notifyBuild(String buildStatus = 'STARTED') {
+  buildStatus =  buildStatus ?: 'SUCCESSFUL'
+//   sh "echo ${buildStatus}"
+  def subject = "${buildStatus}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'"
+  def summary = "${subject} ${env.BUILD_URL}"
+  def details = """<p>STARTED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+    <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>"""
+  def gchatMessage="*${buildStatus}: ${env.JOB_NAME}*\nCheck console output at _<${env.BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>_"
+
+  def payload = """
+    {"text":"${gchatMessage}"}
+"""
+  def response = httpRequest acceptType: 'APPLICATION_JSON', contentType: 'APPLICATION_JSON', httpMode: 'POST', requestBody: payload, url: "https://chat.googleapis.com/v1/spaces/AAAAyqNE28U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=duHDPh6DY86bbxYpbzHaThmynq2wW5MnB6pwDKSyODI%3D"
+}

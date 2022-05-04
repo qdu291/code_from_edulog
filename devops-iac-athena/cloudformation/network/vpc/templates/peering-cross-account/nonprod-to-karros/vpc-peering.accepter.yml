@@ -1,0 +1,83 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Accepter VPC Peering Template
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Accepter Peering Configuration
+        Parameters:
+          - NumberSubnetsToPeer
+          - SubnetId1
+          - SubnetId2
+          - SubnetId3
+      - Label:
+          default: Requester Peering Configuration
+        Parameters:
+          - VpcPeeringConnectionId
+          - ReqVPCCIDR
+    ParameterLabels:
+      NumberSubnetsToPeer:
+        default: "The total number of subnets to peer"
+      RouteTableId1:
+        default: "RouteTableId 1 to peer"
+      RouteTableId2:
+        default: "RouteTableId 2 to peer"
+      RouteTableId3:
+        default: "RouteTableId 3 to peer"
+      VpcPeeringConnectionId:
+        default: "VPC Peering Connection Id Created in Requester"
+      ReqVPCCIDR:
+        default: "Requester VPC CIDR"
+Parameters:
+  NumberSubnetsToPeer:
+    Type: String
+    Description: The Total Number of Subnets to Peer
+    AllowedValues: 
+      - "1"
+      - "2"
+      - "3"
+    Default: "1"
+  RouteTableId1:
+    Type: String
+    Description: RouteTableId1 1 to peer
+    Default: ''
+  RouteTableId2:
+    Type: String
+    Description: RouteTableId 2 to peer
+    Default: ''
+  RouteTableId3:
+    Type: String
+    Description: RouteTableId 3 to peer
+    Default: ''
+  VpcPeeringConnectionId:
+    Type: String
+    Description: Vpc Peering Connection Id
+  ReqVPCCIDR:
+    Type: String
+    Description: Requester VPC CIDR
+Conditions:
+  Peer2Subnets: !Equals [ !Ref NumberSubnetsToPeer, "2" ]
+  Peer3Subnets: !Equals [ !Ref NumberSubnetsToPeer, "3" ]
+Resources:
+  peerPrivateSubnet1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTableId1
+      DestinationCidrBlock: !Ref ReqVPCCIDR
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId
+  peerPrivateSubnet2Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2Subnets
+    Properties:
+      RouteTableId: !Ref RouteTableId2
+      DestinationCidrBlock: !Ref ReqVPCCIDR
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId
+  peerPrivateSubnet3Route:
+    Condition: Peer3Subnets
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTableId3
+      DestinationCidrBlock: !Ref ReqVPCCIDR
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId

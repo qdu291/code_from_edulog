@@ -1,0 +1,90 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: scale-down-job
+spec:
+  schedule: "0 19 * * *"  # <1> UTC timezone
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            nodeType: system
+          tolerations:
+          - effect: NoSchedule
+            operator: Equal
+            key: component
+            value: system
+          restartPolicy: OnFailure
+          volumes:
+          - name: scale-job
+            configMap:
+              name: scale-job
+              defaultMode: 0777
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl:latest
+            env:
+            - name: ATHENA_SITES
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-site-list
+                  key: scheduling-vn
+            volumeMounts:
+            - mountPath: /tmp
+              name: scale-job
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/bash"]
+            args: ["-c", "./tmp/scale-job.sh stop"]
+          serviceAccountName: scheduled-autoscaler-service-account
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: scale-up-job
+spec:
+  schedule: "0 1 * * *"  # <1> UTC timezone
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            nodeType: system
+          tolerations:
+          - effect: NoSchedule
+            operator: Equal
+            key: component
+            value: system
+          restartPolicy: OnFailure # <2>
+          volumes:
+          - name: scale-job
+            configMap:
+              name: scale-job
+              defaultMode: 0777
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl:latest # <3>
+            env:
+            - name: ATHENA_SITES
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-site-list
+                  key: scheduling-vn
+            volumeMounts:
+            - mountPath: /tmp
+              name: scale-job
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/bash"]
+            args: ["-c", "./tmp/scale-job.sh start"]
+            # args: 
+            #   - scale
+            #   - deployment
+            #   - -l
+            #   - scheduling=vn # <4>
+            #   - --namespace=vb-eks
+            #   - --replicas=1 # <5>
+          serviceAccountName: scheduled-autoscaler-service-account # <6>

@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Athena RDS Template
+Parameters:
+  DBAllocatedStorage:
+    ConstraintDescription:
+      must be between 5 and 4096 GiB. If Iops specified, AllocatedStorage
+      must be at least 100 GiB and with minimum Iops value of 1000
+    Default: "50"
+    Description: The size of the database in gigabytes (GiB)
+    MaxValue: "4096"
+    MinValue: "5"
+    Type: Number
+  DBMaxAllocatedStorage:
+    ConstraintDescription:
+      must be between DBAllocatedStorage and 4096 GiB. If Iops specified, MaxAllocatedStorage
+      must be at least 100 GiB and with minimum Iops value of 1000
+    Default: "150"
+    Description: The size of the database in gigabytes (GiB)
+    MaxValue: "4096"
+    MinValue: "50"
+    Type: Number
+  DBAutoMinorVersionUpgrade:
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+    Description: Select true/false to setup Auto Minor Version upgrade
+    Type: String
+  DBBackupRetentionPeriod:
+    Default: "7"
+    Description: The number of days for which automatic DB snapshots are retained.
+    Type: String
+  DBInstanceClass:
+    ConstraintDescription: Must select a valid database instance type.
+    Default: db.t3.medium
+    Description: The name of the compute and memory capacity class of the DB instance.
+    Type: String
+  DBIops:
+    AllowedValues:
+      - "1000"
+      - "2000"
+      - "3000"
+      - "4000"
+      - "5000"
+      - "6000"
+      - "7000"
+      - "8000"
+      - "9000"
+      - "10000"
+    ConstraintDescription: "1000 Iops min and increased in 1K increments. "
+    Default: "1000"
+    Description: DB Iops. Used only when io1 specified for the StorageType property
+    Type: Number
+  DBMasterUserPassword:
+    AllowedPattern: (?=^.{6,255}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*
+    ConstraintDescription: Min 8 chars.
+    Description: The database admin account password
+    MaxLength: "64"
+    MinLength: "8"
+    NoEcho: "True"
+    Type: String
+  DBMasterUsername:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription:
+      must begin with a letter and contain only alphanumeric
+      characters.
+    Default: postgres
+    Description: The database admin account username
+    MaxLength: "16"
+    MinLength: "1"
+    NoEcho: "true"
+    Type: String
+  DBMultiAZ:
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+    Description:
+      Specifies if the database instance is a multiple Availability Zone
+      deployment.
+    Type: String
+  DBInstanceIdentifier:
+    Description: >-
+      ID for this instance.  If you specify a value the instance will be automatically
+      protected from updates that require replacement of the instance.
+    Type: String
+    Default: ""
+  DBEngineVersion:
+    Description: The version number of the database engine to use
+    Type: String
+    Default: ""
+  DBSnapshotIdentifier:
+    Description: >-
+      The identifier for the DB snapshot to restore from (leave empty for a new
+      database)
+    Type: String
+    Default: ""
+  # DBName:
+  #   AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+  #   Default: ""
+  #   Description: Name of PostgreSQL DB for Athena Stack
+  #   MaxLength: "64"
+  #   MinLength: "5"
+  #   Type: String
+  DBParameterGroupName:
+    Description: The name of an existing DB parameter group
+    Type: String
+    Default: ""
+  DBStorageType:
+    AllowedValues:
+      - standard
+      - gp2
+      - io1
+    Default: gp2
+    Description: The storage type associated with this database instance
+    Type: String
+  DBSecurityGroup:
+    Description: PostgreSQL Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnet1ID:
+    Description: The ID of the 1st private subnet.
+    Type: AWS::EC2::Subnet::Id
+  Subnet2ID:
+    Description: The ID of the 2nd private subnet.
+    Type: AWS::EC2::Subnet::Id
+  VPCID:
+    Description: ID of the VPC you are deploying into (e.g., vpc-0343606e).
+    Type: AWS::EC2::VPC::Id
+    Default: ""
+Conditions:
+  IOPSStorageType: !Equals
+    - !Ref DBStorageType
+    - io1
+  useDBSnapshotIdentifier: !Not [!Equals ["", !Ref DBSnapshotIdentifier]]
+  useDBInstanceIdentifier: !Not [!Equals ["", !Ref DBInstanceIdentifier]]
+  useDBParameterGroupName: !Not [!Equals ["", !Ref DBParameterGroupName]]
+  useDefaultDBParameterGroup: !Equals ["", !Ref DBParameterGroupName]
+  # useDBName: !Not [!Equals ["", !Ref DBName]]
+Resources:
+  DBParameterGroup:
+    Condition: useDefaultDBParameterGroup
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: DB Paramter Group for PostgreSQL
+      Family: postgres12
+      Parameters:
+        # Allow Debezium Connector to connect to RDS
+        rds.logical_replication: 1
+        rds.log_retention_period: 1440 # log retention time
+        log_statement: "all" # log all kind of queries ddl & mod
+        log_min_duration_statement: 2000 # log query when runtime over 2s
+
+  PostgresDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS PostgreSQL DB Instance
+      SubnetIds:
+        - !Ref Subnet1ID
+        - !Ref Subnet2ID
+  PostgreSQLDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      # DBName: !If [useDBName, !Ref DBName, !Ref "AWS::NoValue"]
+      AllocatedStorage: !Ref DBAllocatedStorage
+      MaxAllocatedStorage: !Ref DBMaxAllocatedStorage
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: postgres
+      EngineVersion: !Ref DBEngineVersion
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterUserPassword
+      DBSubnetGroupName: !Ref PostgresDBSubnetGroup
+      DBParameterGroupName:
+        !If [
+          useDBParameterGroupName,
+          !Ref DBParameterGroupName,
+          !Ref DBParameterGroup,
+        ]
+      DBSnapshotIdentifier:
+        !If [
+          useDBSnapshotIdentifier,
+          !Ref DBSnapshotIdentifier,
+          !Ref "AWS::NoValue",
+        ]
+      DBInstanceIdentifier:
+        !If [
+          useDBInstanceIdentifier,
+          !Ref DBInstanceIdentifier,
+          !Ref "AWS::NoValue",
+        ]
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      MultiAZ: !Ref DBMultiAZ
+      StorageType: !Ref DBStorageType
+      AutoMinorVersionUpgrade: !Ref DBAutoMinorVersionUpgrade
+      BackupRetentionPeriod: !Ref DBBackupRetentionPeriod
+      Iops: !If
+        - IOPSStorageType
+        - !Ref DBIops
+        - !Ref AWS::NoValue
+      EnableCloudwatchLogsExports:
+        - postgresql
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PostgreSQLDB
+Outputs:
+  DBIdentifier:
+    Description: RDS DB Instance Identifier
+    Value: !Ref PostgreSQLDB
+  RDSEndPoint:
+    Description: Amazon PostgresSQL Endpoint to connect
+    Value: !Sub ${PostgreSQLDB.Endpoint.Address}
+  RDSEndPointPort:
+    Description: Amazon PostgreSQL Endpoint to connect
+    Value: !Sub ${PostgreSQLDB.Endpoint.Port}
